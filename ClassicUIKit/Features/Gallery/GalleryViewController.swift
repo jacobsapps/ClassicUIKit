@@ -59,13 +59,6 @@ final class GalleryViewController: UIViewController {
         let addImage = UIImage(systemName: "plus")
         navigationItem.rightBarButtonItem = UIBarButtonItem(image: addImage, style: .plain, target: self, action: #selector(handleAddTapped))
     }
-    
-    func canvasAspectRatio() -> CGFloat {
-        let bounds = view.window?.bounds ?? UIScreen.main.bounds
-        guard bounds.width > 0 else { return 1 }
-        return bounds.height / bounds.width
-    }
-
     private func layoutViews() {
         view.addSubview(collectionView)
         view.addSubview(loadingView)

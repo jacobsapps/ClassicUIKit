@@ -14,26 +14,30 @@ extension Container {
         self { self.makeCollageDatabase() }.singleton
     }
 
+    @MainActor
     var collageRepository: Factory<CollageRepository> {
-        self {
+        self { @MainActor in
             CollageRepositoryImpl(database: Container.shared.collageDatabase())
         }.singleton
     }
 
+    @MainActor
     var imageLoader: Factory<ImageLoader> {
-        self {
+        self { @MainActor in
             ImageLoaderImpl()
         }
     }
 
+    @MainActor
     var photoLibraryService: Factory<PhotoLibraryService> {
-        self {
+        self { @MainActor in
             PhotoLibraryServiceImpl()
         }.singleton
     }
 
+    @MainActor
     var shaderProcessingService: Factory<ShaderProcessingService> {
-        self {
+        self { @MainActor in
             ShaderProcessingServiceImpl()
         }.singleton
     }

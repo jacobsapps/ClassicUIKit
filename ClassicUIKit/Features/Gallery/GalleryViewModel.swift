@@ -44,27 +44,20 @@ final class GalleryViewModel {
         }
     }
 
-    @concurrent
+    @MainActor
     private func performLoad() async {
-        let repository = collageRepository
-        let loader = imageLoader
-        let collages = (try? repository.loadCollages()) ?? []
+        let collages = (try? collageRepository.loadCollages()) ?? []
         let models = collages.map { collage -> GalleryDisplayModel in
-            let image = loader.image(for: collage.snapshotPath)
+            let image = imageLoader.image(for: collage.snapshotPath)
             return GalleryDisplayModel(collage: collage, image: image)
         }
-        await MainActor.run {
-            self.items = models
-            self.isLoading = false
-        }
+        items = models
+        isLoading = false
     }
 
-    @concurrent
+    @MainActor
     private func performDelete(id: UUID) async {
-        let repository = collageRepository
-        try? repository.deleteCollage(id: id)
-        await MainActor.run {
-            self.items.removeAll { $0.collage.id == id }
-        }
+        try? collageRepository.deleteCollage(id: id)
+        items.removeAll { $0.collage.id == id }
     }
 }

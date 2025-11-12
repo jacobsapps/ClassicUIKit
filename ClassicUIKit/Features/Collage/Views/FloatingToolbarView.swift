@@ -79,8 +79,13 @@ final class FloatingToolbarView: UIView {
 
         scrollView.addSubview(stackView)
         stackView.snp.makeConstraints { make in
-            make.edges.equalTo(scrollView.contentLayoutGuide)
-            make.height.equalTo(scrollView.frameLayoutGuide)
+            make.top.equalTo(scrollView.contentLayoutGuide.snp.top)
+            make.bottom.equalTo(scrollView.contentLayoutGuide.snp.bottom)
+            make.leading.equalTo(scrollView.contentLayoutGuide.snp.leading)
+            make.trailing.equalTo(scrollView.contentLayoutGuide.snp.trailing)
+            make.height.equalTo(scrollView.frameLayoutGuide.snp.height)
+            make.width.greaterThanOrEqualTo(scrollView.frameLayoutGuide.snp.width)
+            make.width.equalTo(scrollView.frameLayoutGuide.snp.width).priority(.high)
         }
 
         doneButton.addTarget(self, action: #selector(handleDoneTap), for: .touchUpInside)
@@ -153,8 +158,8 @@ final class FloatingToggleButton: UIButton {
         layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
         backgroundColor = UIColor.white.withAlphaComponent(0.18)
         translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant(size)).isActive = true
-        widthAnchor.constraint(equalToConstant(size)).isActive = true
+        heightAnchor.constraint(equalToConstant: size).isActive = true
+        widthAnchor.constraint(equalToConstant: size).isActive = true
         updateAppearance()
     }
 
@@ -189,8 +194,8 @@ final class FloatingToolbarActionButton: UIButton {
         layer.cornerCurve = .continuous
         backgroundColor = UIColor.white.withAlphaComponent(0.18)
         translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant(44)).isActive = true
-        widthAnchor.constraint(equalToConstant(44)).isActive = true
+        heightAnchor.constraint(equalToConstant: 44).isActive = true
+        widthAnchor.constraint(equalToConstant: 44).isActive = true
     }
 
     required init?(coder: NSCoder) {

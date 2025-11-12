@@ -38,60 +38,46 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
         for shader in shaders {
             switch shader {
             case .pixellate:
+                guard let kernel = pixellateKernel else { continue }
                 let maxDimension = max(ciImage.extent.width, ciImage.extent.height)
                 let pixelScale = max(CGFloat(4), maxDimension / 50)
-                if let kernel = pixellateKernel {
-                    ciImage = applyKernel(kernel, to: ciImage, arguments: [Float(pixelScale)])
-                } else if let fallback = applyPixellateFallback(to: ciImage, scale: pixelScale) {
-                    ciImage = fallback
-                }
+                ciImage = applyKernel(kernel, to: ciImage, arguments: [Float(pixelScale)])
             case .grainy:
-                if let kernel = grainyKernel {
-                    ciImage = applyKernel(kernel, to: ciImage)
-                }
+                guard let kernel = grainyKernel else { continue }
+                ciImage = applyKernel(kernel, to: ciImage)
             case .grayscale:
-                if let kernel = grayscaleKernel {
-                    ciImage = applyKernel(kernel, to: ciImage)
-                }
+                guard let kernel = grayscaleKernel else { continue }
+                ciImage = applyKernel(kernel, to: ciImage)
             case .spectral:
-                if let kernel = spectralKernel {
-                    ciImage = applyKernel(kernel, to: ciImage)
-                }
+                guard let kernel = spectralKernel else { continue }
+                ciImage = applyKernel(kernel, to: ciImage)
             case .threeDGlasses:
-                if let kernel = threeDGlassesKernel {
-                    ciImage = applyKernel(kernel, to: ciImage)
-                } else if let fallback = applyThreeDFallback(to: ciImage) {
-                    ciImage = fallback
-                }
+                guard let kernel = threeDGlassesKernel else { continue }
+                ciImage = applyKernel(kernel, to: ciImage)
             case .glitch:
+                guard let kernel = glitchKernel else { continue }
                 let timeValue = Float(CFAbsoluteTimeGetCurrent().truncatingRemainder(dividingBy: 100))
-                if let kernel = glitchKernel {
-                    let args: [Any] = [
-                        Float(ciImage.extent.width),
-                        Float(ciImage.extent.height),
-                        timeValue
-                    ]
-                    ciImage = applyKernel(kernel, to: ciImage, arguments: args)
-                } else if let fallback = applyGlitchFallback(to: ciImage, time: timeValue) {
-                    ciImage = fallback
-                }
+                let args: [Any] = [
+                    Float(ciImage.extent.width),
+                    Float(ciImage.extent.height),
+                    timeValue
+                ]
+                ciImage = applyKernel(kernel, to: ciImage, arguments: args)
             case .thickGlassSquares:
-                if let kernel = thickGlassKernel {
-                    let intensity = Float(min(ciImage.extent.width, ciImage.extent.height) / 32)
-                    ciImage = applyWarpKernel(kernel, to: ciImage, arguments: [intensity])
-                }
+                guard let kernel = thickGlassKernel else { continue }
+                let intensity = Float(min(ciImage.extent.width, ciImage.extent.height) / 32)
+                ciImage = applyWarpKernel(kernel, to: ciImage, arguments: [intensity])
             case .lens:
-                if let kernel = lensKernel {
-                    let args: [Any] = [
-                        Float(ciImage.extent.width),
-                        Float(ciImage.extent.height),
-                        Float(0.5),
-                        Float(0.5),
-                        Float(0.35),
-                        Float(0.65)
-                    ]
-                    ciImage = applyWarpKernel(kernel, to: ciImage, arguments: args)
-                }
+                guard let kernel = lensKernel else { continue }
+                let args: [Any] = [
+                    Float(ciImage.extent.width),
+                    Float(ciImage.extent.height),
+                    Float(0.5),
+                    Float(0.5),
+                    Float(0.35),
+                    Float(0.65)
+                ]
+                ciImage = applyWarpKernel(kernel, to: ciImage, arguments: args)
             }
         }
 
@@ -129,48 +115,4 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
         ) ?? image
     }
 
-    private func applyPixellateFallback(to image: CIImage, scale: CGFloat) -> CIImage? {
-        let filter = CIFilter.pixellate()
-        filter.inputImage = image
-        filter.scale = Float(scale)
-        return filter.outputImage?.cropped(to: image.extent)
-    }
-
-    private func applyThreeDFallback(to image: CIImage) -> CIImage? {
-        let redOnly = image.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: 1, y: 0, z: 0, w: 0),
-            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0)
-        ])
-        let blueOnly = image.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: 1, w: 0),
-            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0)
-        ])
-        let redShift = redOnly.applyingFilter("CIAffineTransform", parameters: [
-            kCIInputTransformKey: CGAffineTransform(translationX: -3, y: -3)
-        ])
-        let blueShift = blueOnly.applyingFilter("CIAffineTransform", parameters: [
-            kCIInputTransformKey: CGAffineTransform(translationX: 2, y: 2)
-        ])
-        return redShift.composited(over: blueShift).composited(over: image)
-    }
-
-    private func applyGlitchFallback(to image: CIImage, time: Float) -> CIImage? {
-        guard let noise = CIFilter(name: "CIRandomGenerator")?.outputImage else { return image }
-        let offset = CGFloat(sin(time) * 15)
-        let displacedNoise = noise
-            .applyingFilter("CIAffineTransform", parameters: [
-                kCIInputTransformKey: CGAffineTransform(translationX: offset, y: 0)
-            ])
-            .applyingFilter("CIAffineTransform", parameters: [
-                kCIInputTransformKey: CGAffineTransform(scaleX: 2, y: 2)
-            ])
-        return image.applyingFilter("CIDisplacementDistortion", parameters: [
-            "inputDisplacementImage": displacedNoise,
-            kCIInputScaleKey: 25
-        ])
-    }
 }

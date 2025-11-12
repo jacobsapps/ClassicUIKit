@@ -106,6 +106,8 @@ final class CollageViewController: UIViewController {
         view.addSubview(floatingToolbar)
         view.addSubview(savingOverlay)
         savingOverlay.contentView.addSubview(savingIndicator)
+        floatingToolbar.setContentHuggingPriority(.required, for: .horizontal)
+        floatingToolbar.setContentCompressionResistancePriority(.required, for: .horizontal)
 
         navigationBar.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide)
@@ -119,6 +121,8 @@ final class CollageViewController: UIViewController {
         floatingToolbar.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.bottom.equalTo(view.safeAreaLayoutGuide).inset(24)
+            make.leading.greaterThanOrEqualTo(view.safeAreaLayoutGuide.snp.leading).offset(24)
+            make.trailing.lessThanOrEqualTo(view.safeAreaLayoutGuide.snp.trailing).offset(-24)
         }
         floatingToolbar.alpha = 0
         floatingToolbar.isHidden = true

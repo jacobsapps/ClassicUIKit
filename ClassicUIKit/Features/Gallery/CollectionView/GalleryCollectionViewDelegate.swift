@@ -12,7 +12,6 @@ extension GalleryViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let totalSpacing: CGFloat = 16 * 3
         let width = (collectionView.bounds.width - totalSpacing) / 2
-        let aspectRatio = canvasAspectRatio()
-        return CGSize(width: width, height: width * aspectRatio)
+        return CGSize(width: width, height: width * 1.4)
     }
 }
