@@ -2,9 +2,9 @@ import UIKit
 
 extension GalleryViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard let item = dataSource.itemIdentifier(for: indexPath),
+        guard let collageID = dataSource.itemIdentifier(for: indexPath),
               let cell = collectionView.cellForItem(at: indexPath) as? GalleryCollectionViewCell else { return }
-        viewModel.selectCollage(id: item.collage.id, anchorView: cell.imageView)
+        viewModel.selectCollage(id: collageID, anchorView: cell.imageView)
     }
 }
 

@@ -1,6 +1,5 @@
 import UIKit
 import SnapKit
-import Observation
 
 final class CollageViewController: UIViewController {
 
@@ -9,8 +8,8 @@ final class CollageViewController: UIViewController {
 
     private let canvasView: UIView = {
         let view = UIView()
-        view.backgroundColor = .tertiarySystemFill
-        view.layer.cornerRadius = 24
+        view.backgroundColor = .black
+        view.layer.cornerRadius = 0
         view.clipsToBounds = true
         return view
     }()
@@ -32,11 +31,9 @@ final class CollageViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .black
         configureToolbar()
         layoutViews()
-        bindLayoutObservation()
-        bindPropertyObservation()
         setupCanvasTap()
         viewModel.loadIfNeeded()
     }
@@ -47,7 +44,13 @@ final class CollageViewController: UIViewController {
         if newSize != .zero && newSize != viewModel.canvasSize {
             viewModel.canvasSize = newSize
         }
+    }
+
+    override func updateProperties() {
+        super.updateProperties()
         syncCanvas()
+        updateToolbar()
+        updateSavingState()
     }
 
     private func configureToolbar() {
@@ -59,8 +62,8 @@ final class CollageViewController: UIViewController {
     }
 
     private func layoutViews() {
+        view.insertSubview(canvasView, at: 0)
         view.addSubview(actionToolbar)
-        view.addSubview(canvasView)
         view.addSubview(floatingToolbar)
         view.addSubview(savingOverlay)
         savingOverlay.contentView.addSubview(savingIndicator)
@@ -69,11 +72,11 @@ final class CollageViewController: UIViewController {
             make.top.equalTo(view.safeAreaLayoutGuide).offset(8)
             make.leading.trailing.equalToSuperview()
         }
+        actionToolbar.setBackgroundImage(UIImage(), forToolbarPosition: .any, barMetrics: .default)
+        actionToolbar.isTranslucent = true
 
         canvasView.snp.makeConstraints { make in
-            make.top.equalTo(actionToolbar.snp.bottom).offset(16)
-            make.leading.trailing.equalToSuperview().inset(16)
-            make.bottom.equalTo(view.safeAreaLayoutGuide).inset(120)
+            make.edges.equalToSuperview()
         }
 
         floatingToolbar.snp.makeConstraints { make in
@@ -84,7 +87,7 @@ final class CollageViewController: UIViewController {
         floatingToolbar.isHidden = true
 
         savingOverlay.snp.makeConstraints { make in
-            make.edges.equalTo(canvasView)
+            make.edges.equalToSuperview()
         }
         savingOverlay.isHidden = true
 
@@ -98,32 +101,6 @@ final class CollageViewController: UIViewController {
         floatingToolbar.onShaderToggle = { [weak self] shader in
             self?.viewModel.toggleShader(shader)
         }
-    }
-
-    private func bindLayoutObservation() {
-        withObservationTracking { [weak self] in
-            guard let self else { return }
-            _ = self.viewModel.canvasItems
-            _ = self.viewModel.selectedItemID
-            _ = self.viewModel.canvasSize
-        } onChange: { [weak self] in
-            self?.view.setNeedsLayout()
-            self?.bindLayoutObservation()
-        }
-    }
-
-    private func bindPropertyObservation() {
-        withObservationTracking { [weak self] in
-            guard let self else { return }
-            self.updateProperties()
-        } onChange: { [weak self] in
-            self?.bindPropertyObservation()
-        }
-    }
-
-    private func updateProperties() {
-        updateToolbar()
-        updateSavingState()
     }
 
     private func updateToolbar() {
@@ -219,6 +196,10 @@ final class CollageViewController: UIViewController {
     @objc func handleSaveTapped() {
         let snapshot = canvasView.snapshotImage()
         viewModel.saveCollage(snapshot: snapshot)
+    }
+
+    func canvasFrame(in targetView: UIView) -> CGRect {
+        targetView.convert(canvasView.bounds, from: canvasView)
     }
 
     @objc func handleBackTapped() {

@@ -33,23 +33,35 @@ private final class HeroAnimator: NSObject, UIViewControllerAnimatedTransitionin
     }
 
     private func animatePresentation(using context: UIViewControllerContextTransitioning) {
-        guard let toView = context.view(forKey: .to) else {
+        guard
+            let toView = context.view(forKey: .to),
+            let toViewController = context.viewController(forKey: .to)
+        else {
             context.completeTransition(false)
             return
         }
 
         let container = context.containerView
-        let finalFrame = context.finalFrame(for: context.viewController(forKey: .to) ?? UIViewController())
+        let finalFrame = context.finalFrame(for: toViewController)
         toView.frame = finalFrame
         toView.alpha = 0
         container.addSubview(toView)
 
         let snapshot = originSnapshot(in: container, fallback: toView)
+        snapshot.layer.masksToBounds = true
+        snapshot.layer.cornerCurve = .continuous
         container.addSubview(snapshot)
         originView?.isHidden = true
 
+        let targetFrame: CGRect
+        if let collageController = toViewController as? CollageViewController {
+            targetFrame = collageController.canvasFrame(in: container)
+        } else {
+            targetFrame = finalFrame
+        }
+
         UIView.animate(withDuration: duration, delay: 0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.6, options: [.curveEaseInOut]) {
-            snapshot.frame = finalFrame
+            snapshot.frame = targetFrame
             toView.alpha = 1
         } completion: { finished in
             self.originView?.isHidden = false
@@ -69,6 +81,8 @@ private final class HeroAnimator: NSObject, UIViewControllerAnimatedTransitionin
 
         let snapshot = fromView.snapshotView(afterScreenUpdates: false) ?? UIView(frame: fromView.frame)
         snapshot.frame = fromView.frame
+        snapshot.layer.masksToBounds = true
+        snapshot.layer.cornerCurve = .continuous
         container.addSubview(snapshot)
         fromView.removeFromSuperview()
 
@@ -86,6 +100,9 @@ private final class HeroAnimator: NSObject, UIViewControllerAnimatedTransitionin
            let originSnapshot = originView.snapshotView(afterScreenUpdates: true) {
             let frame = originView.convert(originView.bounds, to: container)
             originSnapshot.frame = frame
+            originSnapshot.layer.cornerRadius = originView.layer.cornerRadius
+            originSnapshot.layer.cornerCurve = .continuous
+            originSnapshot.clipsToBounds = true
             return originSnapshot
         }
         let fallbackSnapshot = view.snapshotView(afterScreenUpdates: true) ?? view

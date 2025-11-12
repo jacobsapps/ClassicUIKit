@@ -12,7 +12,7 @@
 
 ## Feature: Gallery
 - Files live under `Features/Gallery`.
-- `GalleryViewModel` loads collages asynchronously (`CollageRepository` + `ImageLoaderService`) and produces `GalleryDisplayModel` items with cached snapshots.
+- `GalleryViewModel` loads collages asynchronously (`CollageRepository` + `ImageLoader`) and produces `GalleryDisplayModel` items with cached snapshots.
 - `GalleryViewController` shows a two-column `UICollectionView` (diffable data source). Selecting a cell triggers coordinator hero transition; tapping add uses the nav bar button.
 - Empty and loading states handled with `UIActivityIndicatorView` + reusable `EmptyStateView`.
 
@@ -22,7 +22,7 @@
   - Loading/saving collages via `CollageRepository` (SwiftData + filesystem hybrid similar to SummonSelf project).
   - Managing `CanvasItemModel` structs for every image (transform, shaders, z-order, cutouts, asset paths).
   - Cutouts use `VNGenerateForegroundInstanceMaskRequest` (based on SummonSelf's `GenerationViewModel`).
-  - Shader stack now processed by `CoreImageShaderService` (see below) for pixellate / glitch / 3D effects, keeping images reactive when toggled.
+- Shader stack now processed by `ShaderProcessingServiceImpl` (see below) for pixellate / glitch / 3D effects, keeping images reactive when toggled.
   - Tracks `hasUnsavedChanges`, `isSaving`, and selection to drive warnings + toolbar state.
 - `CollageViewController`:
   - Hosts a SnapKit canvas, toolbar, and floating liquid-glass effect control surface.
@@ -40,11 +40,11 @@
 - Persistence: `CollageEntity` + `CollageItemEntity` (SwiftData) hold metadata; images & cutouts are JPEG/PNG on disk via `ImageFileManager`, mirroring SummonSelf’s hybrid strategy.
 - `CollageRepository` orchestrates disk writes + SwiftData upserts and exposes helpers to persist item assets lazily.
 - `PhotoLibraryService` wraps permission-gated picker presentation and asset saving (add-only auth).
-- `ImageLoaderService` lazily loads cached snapshots and cutouts from disk for the gallery + editing canvas.
-- **Shader pipeline** (`Services/ImageShaderService.swift` + `Shaders/ImageShaders.metal`):
+- `ImageLoader` lazily loads cached snapshots and cutouts from disk for the gallery + editing canvas.
+- **Shader pipeline** (`Services/ShaderProcessingService.swift` + `Shaders/ImageShaders.metal`):
   - Inspired by `/Published/CoreImageToy`, replaces the earlier raw Metal compute path with Core Image color kernels (simpler setup, no manual textures).
   - Pixellate uses `CIPixellate`; glitch & 3D glasses use custom stitchable kernels invoked via `CIKernel(functionName:fromMetalLibraryData:)`.
-  - `ShaderProcessingServiceProtocol` keeps the view model decoupled from Core Image; DI exposes `CoreImageShaderService`.
+  - `ShaderProcessingService` keeps the view model decoupled from Core Image; DI exposes `ShaderProcessingServiceImpl`.
 
 ## Tests
 - Gallery: `GalleryViewModelTests` + `GalleryViewControllerTests` cover data loading, navigation hooks, and rendering.
@@ -70,7 +70,7 @@
 - Gallery Feature: `Features/Gallery/**/*`.
 - Collage Feature: `Features/Collage/**/*` (view model, controller, canvas/toggles).
 - Models & persistence: `Models/`, `Services/CollageRepository.swift`, `Models/CollageEntity.swift`.
-- Shaders & imaging: `Servicios/ImageShaderService.swift`, `Shaders/ImageShaders.metal`, `Services/ImageFileManager.swift`.
+- Shaders & imaging: `Services/ShaderProcessingService.swift`, `Shaders/ImageShaders.metal`, `Services/ImageFileManager.swift`.
 - Tests: `ClassicUIKitTests/Gallery/*`, `ClassicUIKitTests/Collage/*`.
 
 Feel free to extend these notes as new services/features are added.

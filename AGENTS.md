@@ -1,0 +1,18 @@
+## Project Observations & Preferences
+
+- Prefer UIKit Observable macro; layout/state should respond automatically through `updateProperties()`/`viewWillLayoutSubviews` so UIKit invalidates layout on model changes—avoid `withObservationTracking` unless a one-off dependency needs to be tracked manually. See https://dev.to/arshtechpro/ios-26-uikit-gets-swiftui-superpowers-observable-and-updateproperties-3l26 for how `updateProperties()` mirrors SwiftUI and when UIKit reruns layout.
+- Use Factory (FactoryKit) DI directly; services live as `Protocol`/`Impl` pairs, register them on `Container.shared`, inject with `@Injected(Container.shared.someFactory)` and mark injected properties `@ObservationIgnored`.
+- Inject services with the key-path shorthand (`@Injected(\.collageRepository)`) so FactoryKit resolves at compile time; avoid referencing `Container.shared` directly inside `@Injected`.
+- Treat view models/controllers as main-actor isolated (Xcode builds in Swift 6.2 "global actors by default" mode): snapshot any injected service or model you need before hopping into `Task.detached`, and funnel all property mutations back through `MainActor.run` to stay compliant.
+- Service protocols registered in Factory are also main-actor bound; when you need to call them from a detached task, wrap the call inside `await MainActor.run { ... }` and pass plain-value snapshots (IDs, structs, images) into the detached work first.
+- Provide `NSPhotoLibraryAddUsageDescription` via Xcode build settings (no manual Info.plist) so saving collages to the photo library does not crash when requesting add-only access.
+- When building diffable data sources, prefer primitive section identifiers (e.g., a static string constant) instead of nested enums so they remain `Sendable` under Swift's strict isolation rules.
+- SwiftData’s `#Predicate` macro doesn’t like capturing reference types from main-actor state; copy scalar IDs (e.g., `let collageID = collage.id`) outside the predicate closure and compare against that constant.
+- Layout is always SnapKit and controllers/UI per screen live under their feature folder (e.g., `Features/Gallery`, `Features/Collage`); keep Canvas/toolbars MVVM-friendly and shift heavy logic (cutouts, shader stacking, persistence) into dedicated services instead of bloated view models.
+- Collage screens render edge-to-edge (canvas pinned to the view) with overlaid toolbars; the floating toolbar should stay rounded with a glassy blur/highlight treatment, matching the current `FloatingToolbarView` implementation.
+- Hero transitions should animate snapshots into the canvas frame instead of stretching to full screen—use `CollageViewController.canvasFrame(in:)` from custom animators.
+- Shader buttons depend on the Metal kernels in `Shaders/ImageShaders.metal`; keep the compiled `.metallib` in the bundle (falls back to `default.metallib`) and pass Float arguments when invoking kernels so pixellate/glitch/3D effects render correctly.
+- Target is landscape-only; size canvases, hero transitions, and toolbars expecting a wide layout (safe areas handled via Auto Layout).
+- For collection views bound to Observable models, rely on `configurationUpdateHandler` so UIKit re-runs it automatically when the model mutates; don’t wrap it in extra observation helpers.
+- Tests should register mock implementations through the Factory container so view models resolve the correct services, mirroring production DI plumbing; keep hero modal coordinator navigation intact.
+- Favor programmatic UI, isolate async work via `Task` or services, and keep view models simple data/state sources; avoid unnecessary `NSObject` chicanery unless required by UIKit delegates handled by the controller.

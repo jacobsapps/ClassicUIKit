@@ -7,8 +7,19 @@ final class FloatingToolbarView: UIView {
     var onShaderToggle: ((ShaderType) -> Void)?
 
     private let blurView: UIVisualEffectView = {
-        let blur = UIBlurEffect(style: .systemMaterial)
+        let blur = UIBlurEffect(style: .systemUltraThinMaterial)
         return UIVisualEffectView(effect: blur)
+    }()
+
+    private let highlightLayer: CAGradientLayer = {
+        let layer = CAGradientLayer()
+        layer.colors = [
+            UIColor.white.withAlphaComponent(0.35).cgColor,
+            UIColor.white.withAlphaComponent(0.05).cgColor
+        ]
+        layer.startPoint = CGPoint(x: 0, y: 0)
+        layer.endPoint = CGPoint(x: 1, y: 1)
+        return layer
     }()
 
     private let stackView: UIStackView = {
@@ -22,7 +33,7 @@ final class FloatingToolbarView: UIView {
     private let cutoutButton = FloatingToggleButton(symbolName: "scissors")
     private let pixellateButton = FloatingToggleButton(symbolName: "rectangle.split.2x2")
     private let threeDButton = FloatingToggleButton(symbolName: "eyeglasses")
-    private let glitchButton = FloatingToggleButton(symbolName: "bolt.horizontal.waveform")
+    private let glitchButton = FloatingToggleButton(symbolName: "waveform")
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -34,19 +45,22 @@ final class FloatingToolbarView: UIView {
     }
 
     private func configure() {
-        layer.cornerRadius = 28
+        layer.cornerRadius = 36
+        layer.cornerCurve = .continuous
         layer.masksToBounds = false
-        layer.shadowColor = UIColor.black.withAlphaComponent(0.2).cgColor
+        layer.shadowColor = UIColor.black.withAlphaComponent(0.25).cgColor
         layer.shadowOpacity = 1
-        layer.shadowRadius = 16
-        layer.shadowOffset = CGSize(width: 0, height: 10)
+        layer.shadowRadius = 20
+        layer.shadowOffset = CGSize(width: 0, height: 12)
 
         addSubview(blurView)
-        blurView.layer.cornerRadius = 28
+        blurView.layer.cornerRadius = 36
+        blurView.layer.cornerCurve = .continuous
         blurView.clipsToBounds = true
         blurView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
+        blurView.layer.insertSublayer(highlightLayer, at: 0)
 
         addSubview(stackView)
         stackView.snp.makeConstraints { make in
@@ -57,6 +71,12 @@ final class FloatingToolbarView: UIView {
             button.addTarget(self, action: #selector(handleButtonTap(_:)), for: .touchUpInside)
             stackView.addArrangedSubview(button)
         }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        highlightLayer.frame = blurView.bounds
+        highlightLayer.cornerRadius = blurView.layer.cornerRadius
     }
 
     func update(with state: CollageToolbarState) {
@@ -96,13 +116,14 @@ final class FloatingToggleButton: UIButton {
         configuration.baseForegroundColor = .label
         configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
         self.configuration = configuration
-        layer.cornerRadius = 22
+        layer.cornerRadius = 26
+        layer.cornerCurve = .continuous
         layer.borderWidth = 1
-        layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
-        backgroundColor = UIColor.white.withAlphaComponent(0.2)
+        layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
+        backgroundColor = UIColor.white.withAlphaComponent(0.18)
         translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: 44).isActive = true
-        widthAnchor.constraint(equalToConstant: 44).isActive = true
+        heightAnchor.constraint(equalToConstant: 52).isActive = true
+        widthAnchor.constraint(equalToConstant: 52).isActive = true
         updateAppearance()
     }
 
@@ -112,12 +133,12 @@ final class FloatingToggleButton: UIButton {
 
     private func updateAppearance() {
         if isToggled {
-            backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
-            layer.borderColor = UIColor.systemBlue.cgColor
+            backgroundColor = UIColor.systemBlue.withAlphaComponent(0.85)
+            layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.95).cgColor
             configuration?.baseForegroundColor = .white
         } else {
-            backgroundColor = UIColor.white.withAlphaComponent(0.2)
-            layer.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
+            backgroundColor = UIColor.white.withAlphaComponent(0.18)
+            layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
             configuration?.baseForegroundColor = .label
         }
     }

@@ -23,11 +23,11 @@ final class CollageViewModel {
         return CollageToolbarState(isVisible: true, isCutoutActive: item.usesCutout, shaderStates: shaderStates)
     }
 
-    @ObservationIgnored @Injected(Container.shared.collageRepository) private var collageRepository: CollageRepository
+    @ObservationIgnored @Injected(\.collageRepository) private var collageRepository: CollageRepository
     @ObservationIgnored private weak var coordinator: CollageCoordinating?
-    @ObservationIgnored @Injected(Container.shared.photoLibraryService) private var photoLibraryService: PhotoLibraryService
-    @ObservationIgnored @Injected(Container.shared.shaderProcessingService) private var shaderService: ShaderProcessingService
-    @ObservationIgnored @Injected(Container.shared.imageLoader) private var imageLoader: ImageLoader
+    @ObservationIgnored @Injected(\.photoLibraryService) private var photoLibraryService: PhotoLibraryService
+    @ObservationIgnored @Injected(\.shaderProcessingService) private var shaderService: ShaderProcessingService
+    @ObservationIgnored @Injected(\.imageLoader) private var imageLoader: ImageLoader
     @ObservationIgnored private var cutoutTasks: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var hasLoaded = false
 
@@ -118,32 +118,34 @@ final class CollageViewModel {
             return
         }
         isSaving = true
+        let repository = collageRepository
+        let libraryService = photoLibraryService
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
+            let collageID = await MainActor.run { self.collage.id }
+            var stagedItems = await MainActor.run { self.canvasItems }
             var updatedItems: [CollageItem] = []
-            let currentItems = await MainActor.run { self.canvasItems }
-            for canvasItem in currentItems {
+
+            for index in stagedItems.indices {
+                var canvasItem = stagedItems[index]
                 if canvasItem.requiresAssetSave || canvasItem.basePath == nil {
-                    let paths = self.collageRepository.persistItemAssets(
-                        collageID: self.collage.id,
-                        itemID: canvasItem.id,
-                        baseImage: canvasItem.baseImage,
-                        cutout: canvasItem.cutoutImage
-                    )
-                    await MainActor.run {
-                        if let idx = self.canvasItems.firstIndex(where: { $0.id == canvasItem.id }) {
-                            self.canvasItems[idx].basePath = paths.basePath
-                            self.canvasItems[idx].cutoutPath = paths.cutoutPath
-                            self.canvasItems[idx].requiresAssetSave = false
-                        }
+                    let paths = await MainActor.run {
+                        repository.persistItemAssets(
+                            collageID: collageID,
+                            itemID: canvasItem.id,
+                            baseImage: canvasItem.baseImage,
+                            cutout: canvasItem.cutoutImage
+                        )
                     }
+                    canvasItem.basePath = paths.basePath
+                    canvasItem.cutoutPath = paths.cutoutPath
+                    canvasItem.requiresAssetSave = false
                 }
-                let basePath = await MainActor.run { self.canvasItems.first(where: { $0.id == canvasItem.id })?.basePath } ?? ""
-                let cutoutPath = await MainActor.run { self.canvasItems.first(where: { $0.id == canvasItem.id })?.cutoutPath }
+                stagedItems[index] = canvasItem
                 let collageItem = CollageItem(
                     id: canvasItem.id,
-                    baseImagePath: basePath,
-                    cutoutImagePath: cutoutPath,
+                    baseImagePath: canvasItem.basePath ?? "",
+                    cutoutImagePath: canvasItem.cutoutPath,
                     usesCutout: canvasItem.usesCutout,
                     zPosition: canvasItem.zPosition,
                     transform: canvasItem.transform,
@@ -151,15 +153,19 @@ final class CollageViewModel {
                 )
                 updatedItems.append(collageItem)
             }
-            self.collage.items = updatedItems
-            let savedCollage = try? self.collageRepository.saveCollage(self.collage, snapshot: snapshot)
-            self.photoLibraryService.saveImageToLibrary(snapshot) { _ in }
+
+            let workingCollage = await MainActor.run { self.collage }
+            var updatedCollage = workingCollage
+            updatedCollage.items = updatedItems
+            let savedCollage = await MainActor.run {
+                try? repository.saveCollage(updatedCollage, snapshot: snapshot)
+            }
             await MainActor.run {
+                self.canvasItems = stagedItems
                 self.isSaving = false
                 self.hasUnsavedChanges = false
-                if let savedCollage {
-                    self.collage = savedCollage
-                }
+                libraryService.saveImageToLibrary(snapshot) { _ in }
+                self.collage = savedCollage ?? updatedCollage
                 self.coordinator?.dismissCollage(shouldRefresh: true)
             }
         }
@@ -189,7 +195,7 @@ final class CollageViewModel {
             rotation: 0,
             size: clampedSize
         )
-        var item = CanvasItemModel(
+        let item = CanvasItemModel(
             baseImage: image,
             renderedImage: image,
             transform: transform,
@@ -207,9 +213,12 @@ final class CollageViewModel {
             canvasItems[index].renderedImage = sourceImage
             return
         }
+        let processingService = shaderService
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let filtered = self.shaderService.apply(shaders: item.shaderStack, to: sourceImage)
+            let filtered = await MainActor.run {
+                processingService.apply(shaders: item.shaderStack, to: sourceImage)
+            }
             await MainActor.run {
                 guard let idx = self.canvasItems.firstIndex(where: { $0.id == item.id }) else { return }
                 self.canvasItems[idx].renderedImage = filtered ?? sourceImage

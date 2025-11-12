@@ -25,13 +25,18 @@ final class CollageDatabaseImpl: CollageDatabase, Database {
 
     func fetchCollage(id: UUID) throws -> Collage? {
         let context = ModelContext(container)
-        let descriptor = FetchDescriptor<CollageEntity>(predicate: #Predicate { $0.id == id })
+        let descriptor = FetchDescriptor<CollageEntity>(predicate: #Predicate<CollageEntity> { entity in
+            entity.id == id
+        })
         return try context.fetch(descriptor).first?.toDomain()
     }
 
     func upsert(_ collage: Collage) throws {
         let context = ModelContext(container)
-        let descriptor = FetchDescriptor<CollageEntity>(predicate: #Predicate { $0.id == collage.id })
+        let collageID = collage.id
+        let descriptor = FetchDescriptor<CollageEntity>(predicate: #Predicate<CollageEntity> { entity in
+            entity.id == collageID
+        })
         let entity = try context.fetch(descriptor).first ?? CollageEntity(
             id: collage.id,
             snapshotPath: collage.snapshotPath,

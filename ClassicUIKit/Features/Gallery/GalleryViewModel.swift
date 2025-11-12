@@ -9,8 +9,8 @@ final class GalleryViewModel {
     var items: [GalleryDisplayModel] = []
     var isLoading: Bool = false
 
-    @ObservationIgnored @Injected(Container.shared.collageRepository) private var collageRepository: CollageRepository
-    @ObservationIgnored @Injected(Container.shared.imageLoader) private var imageLoader: ImageLoader
+    @ObservationIgnored @Injected(\.collageRepository) private var collageRepository: CollageRepository
+    @ObservationIgnored @Injected(\.imageLoader) private var imageLoader: ImageLoader
     @ObservationIgnored private weak var coordinator: GalleryCoordinating?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
 
@@ -25,16 +25,19 @@ final class GalleryViewModel {
     func load() {
         loadTask?.cancel()
         isLoading = true
+        let repository = collageRepository
+        let loader = imageLoader
         loadTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-            let collages = (try? self.collageRepository.loadCollages()) ?? []
-            let displayModels = collages.map { collage -> GalleryDisplayModel in
-                let image = self.imageLoader.image(for: collage.snapshotPath)
-                return GalleryDisplayModel(collage: collage, image: image)
+            let collages = await MainActor.run { (try? repository.loadCollages()) ?? [] }
+            var models: [GalleryDisplayModel] = []
+            for collage in collages {
+                let image = await MainActor.run { loader.image(for: collage.snapshotPath) }
+                models.append(GalleryDisplayModel(collage: collage, image: image))
             }
             await MainActor.run {
                 guard !Task.isCancelled else { return }
-                self.items = displayModels
+                self.items = models
                 self.isLoading = false
             }
         }

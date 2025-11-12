@@ -10,12 +10,16 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
 
     private let context = CIContext()
     private let libraryData: Data?
+    private lazy var pixellateKernel = Self.makeKernel(named: "pixellateShader", from: libraryData)
     private lazy var threeDGlassesKernel = Self.makeKernel(named: "threeDGlassesShader", from: libraryData)
     private lazy var glitchKernel = Self.makeKernel(named: "glitchShader", from: libraryData)
 
     init(bundle: Bundle = .main) {
-        if let url = bundle.url(forResource: "default", withExtension: "metallib") {
-            libraryData = try? Data(contentsOf: url)
+        let libraryURL = bundle.url(forResource: "ImageShaders", withExtension: "metallib") ??
+            bundle.url(forResource: "default", withExtension: "metallib")
+        if let libraryURL,
+           let data = try? Data(contentsOf: libraryURL) {
+            libraryData = data
         } else {
             libraryData = nil
         }
@@ -29,16 +33,18 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
         for shader in shaders {
             switch shader {
             case .pixellate:
-                let filter = CIFilter.pixellate()
-                filter.inputImage = ciImage
                 let maxDimension = max(ciImage.extent.width, ciImage.extent.height)
-                filter.scale = max(8, maxDimension / 25)
-                ciImage = filter.outputImage?.cropped(to: ciImage.extent) ?? ciImage
+                let pixelScale = max(CGFloat(8), maxDimension / 25)
+                ciImage = applyKernel(pixellateKernel, to: ciImage, arguments: [Float(pixelScale)])
             case .threeDGlasses:
                 ciImage = applyKernel(threeDGlassesKernel, to: ciImage)
             case .glitch:
                 let timeValue = Float(CFAbsoluteTimeGetCurrent().truncatingRemainder(dividingBy: 100))
-                let args: [Any] = [ciImage.extent.width, ciImage.extent.height, timeValue]
+                let args: [Any] = [
+                    Float(ciImage.extent.width),
+                    Float(ciImage.extent.height),
+                    timeValue
+                ]
                 ciImage = applyKernel(glitchKernel, to: ciImage, arguments: args)
             }
         }
@@ -53,7 +59,8 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
         guard let kernel else { return image }
         var kernelArguments: [Any] = [image]
         kernelArguments.append(contentsOf: arguments)
-        return kernel.apply(extent: image.extent, arguments: kernelArguments) ?? image
+        let roiCallback: CIKernelROICallback = { _, rect in rect }
+        return kernel.apply(extent: image.extent, roiCallback: roiCallback, arguments: kernelArguments) ?? image
     }
 
     private static func makeKernel(named name: String, from data: Data?) -> CIKernel? {

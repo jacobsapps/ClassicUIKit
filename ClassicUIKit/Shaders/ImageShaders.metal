@@ -3,6 +3,16 @@
 using namespace metal;
 
 [[ stitchable ]]
+float4 pixellateShader(
+    coreimage::sampler src,
+    float blockSize
+) {
+    float2 coord = src.coord();
+    float2 pixelatedCoord = floor(coord / blockSize) * blockSize + float2(blockSize * 0.5, blockSize * 0.5);
+    return sample(src, pixelatedCoord);
+}
+
+[[ stitchable ]]
 float4 threeDGlassesShader(
     coreimage::sampler src
 ) {

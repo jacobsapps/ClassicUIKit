@@ -1,14 +1,13 @@
 import UIKit
 import SnapKit
-import Observation
+
+private enum GallerySectionIdentifier {
+    static let main = "gallery-main"
+}
 
 final class GalleryViewController: UIViewController {
 
-    private enum Section {
-        case main
-    }
-
-    private let viewModel: GalleryViewModel
+    let viewModel: GalleryViewModel
     private(set) lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.minimumInteritemSpacing = 16
@@ -22,7 +21,7 @@ final class GalleryViewController: UIViewController {
         return collectionView
     }()
 
-    private lazy var dataSource = makeDataSource()
+    lazy var dataSource = makeDataSource()
     private let loadingView = UIActivityIndicatorView(style: .large)
     private let emptyView = EmptyStateView(message: "Create your first collage by tapping ➕")
 
@@ -41,7 +40,8 @@ final class GalleryViewController: UIViewController {
         view.backgroundColor = .systemBackground
         configureNavbar()
         layoutViews()
-        bindViewModel()
+        applySnapshot()
+        updateLoadingState()
         viewModel.load()
     }
 
@@ -74,18 +74,8 @@ final class GalleryViewController: UIViewController {
         emptyView.isHidden = true
     }
 
-    private func bindViewModel() {
-        withObservationTracking { [weak self] in
-            guard let self else { return }
-            self.updateProperties()
-        } onChange: { [weak self] in
-            DispatchQueue.main.async {
-                self?.bindViewModel()
-            }
-        }
-    }
-
-    private func updateProperties() {
+    override func updateProperties() {
+        super.updateProperties()
         applySnapshot()
         updateLoadingState()
     }
@@ -95,8 +85,8 @@ final class GalleryViewController: UIViewController {
         emptyView.isHidden = !(viewModel.items.isEmpty && !viewModel.isLoading)
     }
 
-    private func makeDataSource() -> UICollectionViewDiffableDataSource<Section, GalleryDisplayModel> {
-        UICollectionViewDiffableDataSource(collectionView: collectionView) { [weak self] collectionView, indexPath, item in
+    private func makeDataSource() -> UICollectionViewDiffableDataSource<String, UUID> {
+        UICollectionViewDiffableDataSource(collectionView: collectionView) { [weak self] collectionView, indexPath, collageID in
             guard
                 let self,
                 let cell = collectionView.dequeueReusableCell(
@@ -106,25 +96,27 @@ final class GalleryViewController: UIViewController {
             else {
                 return UICollectionViewCell()
             }
-            let collageID = item.collage.id
-            cell.configurationUpdateHandler = { [weak self] cell, _ in
-                withObservationTracking {
-                    guard let self else { return }
-                    guard let current = self.viewModel.items.first(where: { $0.collage.id == collageID }) else { return }
-                    cell.configure(with: current)
-                } onChange: { [weak cell] _ in
-                    cell?.setNeedsUpdateConfiguration()
-                }
+            guard let model = self.viewModel.items.first(where: { $0.collage.id == collageID }) else {
+                return cell
             }
-            cell.setNeedsUpdateConfiguration()
+            cell.configurationUpdateHandler = { [weak self] cell, _ in
+                guard
+                    let self,
+                    let galleryCell = cell as? GalleryCollectionViewCell,
+                    let current = self.viewModel.items.first(where: { $0.collage.id == collageID })
+                else { return }
+                galleryCell.configure(with: current)
+            }
+            cell.configure(with: model)
             return cell
         }
     }
 
     private func applySnapshot() {
-        var snapshot = NSDiffableDataSourceSnapshot<Section, GalleryDisplayModel>()
-        snapshot.appendSections([.main])
-        snapshot.appendItems(viewModel.items, toSection: .main)
+        var snapshot = NSDiffableDataSourceSnapshot<String, UUID>()
+        snapshot.appendSections([GallerySectionIdentifier.main])
+        let identifiers = viewModel.items.map { $0.collage.id }
+        snapshot.appendItems(identifiers, toSection: GallerySectionIdentifier.main)
         dataSource.apply(snapshot, animatingDifferences: true)
     }
 
