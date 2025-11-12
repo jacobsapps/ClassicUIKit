@@ -138,6 +138,12 @@ final class CollageViewController: UIViewController {
         floatingToolbar.onShaderToggle = { [weak self] shader in
             self?.viewModel.toggleShader(shader)
         }
+        floatingToolbar.onDone = { [weak self] in
+            self?.handleToolbarDone()
+        }
+        floatingToolbar.onDelete = { [weak self] in
+            self?.handleToolbarDelete()
+        }
     }
 
     private func updateToolbar() {
@@ -311,6 +317,14 @@ final class CollageViewController: UIViewController {
         if gesture.state == .ended {
             updateTransform(for: imageView)
         }
+    }
+
+    private func handleToolbarDone() {
+        viewModel.selectItem(nil)
+    }
+
+    private func handleToolbarDelete() {
+        viewModel.deleteSelectedItem()
     }
 
     @objc private func handleBackButtonTapped() {

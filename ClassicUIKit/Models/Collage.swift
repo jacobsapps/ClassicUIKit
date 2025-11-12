@@ -58,6 +58,45 @@ struct CollageItemTransform: Codable, Equatable {
 
 enum ShaderType: String, Codable, CaseIterable {
     case pixellate
-    case glitch
+    case grainy
+    case grayscale
+    case spectral
     case threeDGlasses
+    case glitch
+    case thickGlassSquares
+    case lens
+
+    static var allCases: [ShaderType] {
+        [
+            .pixellate,
+            .grainy,
+            .grayscale,
+            .spectral,
+            .threeDGlasses,
+            .glitch,
+            .thickGlassSquares,
+            .lens
+        ]
+    }
+
+    var symbolName: String {
+        switch self {
+        case .pixellate:
+            return "rectangle.split.2x2"
+        case .grainy:
+            return "circle.grid.2x2"
+        case .grayscale:
+            return "circle.lefthalf.filled"
+        case .spectral:
+            return "sparkles"
+        case .threeDGlasses:
+            return "eyeglasses"
+        case .glitch:
+            return "waveform"
+        case .thickGlassSquares:
+            return "square.grid.2x2.fill"
+        case .lens:
+            return "viewfinder"
+        }
+    }
 }

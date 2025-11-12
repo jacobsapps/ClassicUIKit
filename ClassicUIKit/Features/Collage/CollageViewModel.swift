@@ -111,6 +111,16 @@ final class CollageViewModel {
         }
     }
 
+    func deleteSelectedItem() {
+        guard let selectedItemID,
+              let index = canvasItems.firstIndex(where: { $0.id == selectedItemID }) else { return }
+        cutoutTasks[selectedItemID]?.cancel()
+        cutoutTasks.removeValue(forKey: selectedItemID)
+        canvasItems.remove(at: index)
+        hasUnsavedChanges = true
+        self.selectedItemID = nil
+    }
+
     func dismissWithoutSaving() {
         coordinator?.dismissCollage(shouldRefresh: false)
     }
