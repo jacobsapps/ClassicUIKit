@@ -77,20 +77,8 @@ final class CollageViewModel {
         canvasItems[index].isProcessingCutout = true
         let image = canvasItems[index].baseImage
         cutoutTasks[selectedItemID]?.cancel()
-        cutoutTasks[selectedItemID] = Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let cutout = try? await self.generateCutout(from: image)
-            await MainActor.run {
-                guard let idx = self.canvasItems.firstIndex(where: { $0.id == selectedItemID }) else { return }
-                self.canvasItems[idx].isProcessingCutout = false
-                if let cutout {
-                    self.canvasItems[idx].cutoutImage = cutout
-                    self.canvasItems[idx].usesCutout = true
-                    self.canvasItems[idx].requiresAssetSave = true
-                    self.hasUnsavedChanges = true
-                    self.refreshRenderedImage(for: idx)
-                }
-            }
+        cutoutTasks[selectedItemID] = Task { [weak self] in
+            await self?.performCutout(for: selectedItemID, image: image)
         }
     }
 
@@ -118,56 +106,8 @@ final class CollageViewModel {
             return
         }
         isSaving = true
-        let repository = collageRepository
-        let libraryService = photoLibraryService
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let collageID = await MainActor.run { self.collage.id }
-            var stagedItems = await MainActor.run { self.canvasItems }
-            var updatedItems: [CollageItem] = []
-
-            for index in stagedItems.indices {
-                var canvasItem = stagedItems[index]
-                if canvasItem.requiresAssetSave || canvasItem.basePath == nil {
-                    let paths = await MainActor.run {
-                        repository.persistItemAssets(
-                            collageID: collageID,
-                            itemID: canvasItem.id,
-                            baseImage: canvasItem.baseImage,
-                            cutout: canvasItem.cutoutImage
-                        )
-                    }
-                    canvasItem.basePath = paths.basePath
-                    canvasItem.cutoutPath = paths.cutoutPath
-                    canvasItem.requiresAssetSave = false
-                }
-                stagedItems[index] = canvasItem
-                let collageItem = CollageItem(
-                    id: canvasItem.id,
-                    baseImagePath: canvasItem.basePath ?? "",
-                    cutoutImagePath: canvasItem.cutoutPath,
-                    usesCutout: canvasItem.usesCutout,
-                    zPosition: canvasItem.zPosition,
-                    transform: canvasItem.transform,
-                    shaderStack: canvasItem.shaderStack
-                )
-                updatedItems.append(collageItem)
-            }
-
-            let workingCollage = await MainActor.run { self.collage }
-            var updatedCollage = workingCollage
-            updatedCollage.items = updatedItems
-            let savedCollage = await MainActor.run {
-                try? repository.saveCollage(updatedCollage, snapshot: snapshot)
-            }
-            await MainActor.run {
-                self.canvasItems = stagedItems
-                self.isSaving = false
-                self.hasUnsavedChanges = false
-                libraryService.saveImageToLibrary(snapshot) { _ in }
-                self.collage = savedCollage ?? updatedCollage
-                self.coordinator?.dismissCollage(shouldRefresh: true)
-            }
+        Task { [weak self] in
+            await self?.performSave(snapshot: snapshot)
         }
     }
 
@@ -188,7 +128,7 @@ final class CollageViewModel {
     }
 
     private func addImageToCanvas(_ image: UIImage) {
-        let clampedSize = defaultItemSize()
+        let clampedSize = itemSize(for: image)
         let transform = CollageItemTransform(
             translation: .zero,
             scale: 1,
@@ -213,16 +153,10 @@ final class CollageViewModel {
             canvasItems[index].renderedImage = sourceImage
             return
         }
-        let processingService = shaderService
-        Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let filtered = await MainActor.run {
-                processingService.apply(shaders: item.shaderStack, to: sourceImage)
-            }
-            await MainActor.run {
-                guard let idx = self.canvasItems.firstIndex(where: { $0.id == item.id }) else { return }
-                self.canvasItems[idx].renderedImage = filtered ?? sourceImage
-            }
+        let shaderStack = item.shaderStack
+        let itemID = item.id
+        Task { [weak self] in
+            await self?.performShaderRefresh(for: itemID, stack: shaderStack, sourceImage: sourceImage)
         }
     }
 
@@ -245,9 +179,91 @@ final class CollageViewModel {
         )
     }
 
-    private func defaultItemSize() -> CGSize {
-        guard canvasSize != .zero else { return CGSize(width: 200, height: 240) }
-        return CGSize(width: canvasSize.width * 0.5, height: canvasSize.height * 0.5)
+    private func itemSize(for image: UIImage) -> CGSize {
+        guard canvasSize != .zero else { return image.size }
+        let maxWidth = canvasSize.width * 0.6
+        let maxHeight = canvasSize.height * 0.6
+        let aspectRatio = image.size.width / max(image.size.height, 1)
+        var width = maxWidth
+        var height = width / aspectRatio
+        if height > maxHeight {
+            height = maxHeight
+            width = height * aspectRatio
+        }
+        return CGSize(width: width, height: height)
+    }
+
+    @concurrent
+    private func performCutout(for itemID: UUID, image: UIImage) async {
+        let cutout = try? await generateCutout(from: image)
+        await MainActor.run {
+            guard let idx = self.canvasItems.firstIndex(where: { $0.id == itemID }) else { return }
+            self.canvasItems[idx].isProcessingCutout = false
+            if let cutout {
+                self.canvasItems[idx].cutoutImage = cutout
+                self.canvasItems[idx].usesCutout = true
+                self.canvasItems[idx].requiresAssetSave = true
+                self.hasUnsavedChanges = true
+                self.refreshRenderedImage(for: idx)
+            }
+        }
+    }
+
+    @concurrent
+    private func performSave(snapshot: UIImage) async {
+        let repository = collageRepository
+        let collageID = await MainActor.run { self.collage.id }
+        var stagedItems = await MainActor.run { self.canvasItems }
+        var updatedItems: [CollageItem] = []
+
+        for index in stagedItems.indices {
+            var currentItem = stagedItems[index]
+            if currentItem.requiresAssetSave || currentItem.basePath == nil {
+                let paths = repository.persistItemAssets(
+                    collageID: collageID,
+                    itemID: currentItem.id,
+                    baseImage: currentItem.baseImage,
+                    cutout: currentItem.cutoutImage
+                )
+                currentItem.basePath = paths.basePath
+                currentItem.cutoutPath = paths.cutoutPath
+                currentItem.requiresAssetSave = false
+            }
+            stagedItems[index] = currentItem
+            let collageItem = CollageItem(
+                id: currentItem.id,
+                baseImagePath: currentItem.basePath ?? "",
+                cutoutImagePath: currentItem.cutoutPath,
+                usesCutout: currentItem.usesCutout,
+                zPosition: currentItem.zPosition,
+                transform: currentItem.transform,
+                shaderStack: currentItem.shaderStack
+            )
+            updatedItems.append(collageItem)
+        }
+
+        var updatedCollage = await MainActor.run { self.collage }
+        updatedCollage.items = updatedItems
+        let savedCollage = try? repository.saveCollage(updatedCollage, snapshot: snapshot)
+
+        await MainActor.run {
+            self.canvasItems = stagedItems
+            self.isSaving = false
+            self.hasUnsavedChanges = false
+            self.photoLibraryService.saveImageToLibrary(snapshot) { _ in }
+            self.collage = savedCollage ?? updatedCollage
+            self.coordinator?.dismissCollage(shouldRefresh: true)
+        }
+    }
+
+    @concurrent
+    private func performShaderRefresh(for itemID: UUID, stack: [ShaderType], sourceImage: UIImage) async {
+        let processingService = shaderService
+        let filtered = processingService.apply(shaders: stack, to: sourceImage)
+        await MainActor.run {
+            guard let idx = self.canvasItems.firstIndex(where: { $0.id == itemID }) else { return }
+            self.canvasItems[idx].renderedImage = filtered ?? sourceImage
+        }
     }
 
     private func generateCutout(from image: UIImage) async throws -> UIImage? {

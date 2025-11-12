@@ -5,6 +5,7 @@ protocol CollageDatabase {
     func fetchCollages() throws -> [Collage]
     func fetchCollage(id: UUID) throws -> Collage?
     func upsert(_ collage: Collage) throws
+    func deleteCollage(id: UUID) throws
 }
 
 final class CollageDatabaseImpl: CollageDatabase, Database {
@@ -55,5 +56,16 @@ final class CollageDatabaseImpl: CollageDatabase, Database {
 
         context.insert(entity)
         try context.save()
+    }
+
+    func deleteCollage(id: UUID) throws {
+        let context = ModelContext(container)
+        let descriptor = FetchDescriptor<CollageEntity>(predicate: #Predicate<CollageEntity> { entity in
+            entity.id == id
+        })
+        if let entity = try context.fetch(descriptor).first {
+            context.delete(entity)
+            try context.save()
+        }
     }
 }

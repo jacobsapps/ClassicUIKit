@@ -34,18 +34,30 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
             switch shader {
             case .pixellate:
                 let maxDimension = max(ciImage.extent.width, ciImage.extent.height)
-                let pixelScale = max(CGFloat(8), maxDimension / 25)
-                ciImage = applyKernel(pixellateKernel, to: ciImage, arguments: [Float(pixelScale)])
+                let pixelScale = max(CGFloat(4), maxDimension / 50)
+                if let kernel = pixellateKernel {
+                    ciImage = applyKernel(kernel, to: ciImage, arguments: [Float(pixelScale)])
+                } else if let fallback = applyPixellateFallback(to: ciImage, scale: pixelScale) {
+                    ciImage = fallback
+                }
             case .threeDGlasses:
-                ciImage = applyKernel(threeDGlassesKernel, to: ciImage)
+                if let kernel = threeDGlassesKernel {
+                    ciImage = applyKernel(kernel, to: ciImage)
+                } else if let fallback = applyThreeDFallback(to: ciImage) {
+                    ciImage = fallback
+                }
             case .glitch:
                 let timeValue = Float(CFAbsoluteTimeGetCurrent().truncatingRemainder(dividingBy: 100))
-                let args: [Any] = [
-                    Float(ciImage.extent.width),
-                    Float(ciImage.extent.height),
-                    timeValue
-                ]
-                ciImage = applyKernel(glitchKernel, to: ciImage, arguments: args)
+                if let kernel = glitchKernel {
+                    let args: [Any] = [
+                        Float(ciImage.extent.width),
+                        Float(ciImage.extent.height),
+                        timeValue
+                    ]
+                    ciImage = applyKernel(kernel, to: ciImage, arguments: args)
+                } else if let fallback = applyGlitchFallback(to: ciImage, time: timeValue) {
+                    ciImage = fallback
+                }
             }
         }
 
@@ -66,5 +78,50 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
     private static func makeKernel(named name: String, from data: Data?) -> CIKernel? {
         guard let data else { return nil }
         return try? CIKernel(functionName: name, fromMetalLibraryData: data)
+    }
+
+    private func applyPixellateFallback(to image: CIImage, scale: CGFloat) -> CIImage? {
+        let filter = CIFilter.pixellate()
+        filter.inputImage = image
+        filter.scale = Float(scale)
+        return filter.outputImage?.cropped(to: image.extent)
+    }
+
+    private func applyThreeDFallback(to image: CIImage) -> CIImage? {
+        let redOnly = image.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 1, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0)
+        ])
+        let blueOnly = image.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputGVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+            "inputBVector": CIVector(x: 0, y: 0, z: 1, w: 0),
+            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0)
+        ])
+        let redShift = redOnly.applyingFilter("CIAffineTransform", parameters: [
+            kCIInputTransformKey: CGAffineTransform(translationX: -3, y: -3)
+        ])
+        let blueShift = blueOnly.applyingFilter("CIAffineTransform", parameters: [
+            kCIInputTransformKey: CGAffineTransform(translationX: 2, y: 2)
+        ])
+        return redShift.composited(over: blueShift).composited(over: image)
+    }
+
+    private func applyGlitchFallback(to image: CIImage, time: Float) -> CIImage? {
+        guard let noise = CIFilter(name: "CIRandomGenerator")?.outputImage else { return image }
+        let offset = CGFloat(sin(time) * 15)
+        let displacedNoise = noise
+            .applyingFilter("CIAffineTransform", parameters: [
+                kCIInputTransformKey: CGAffineTransform(translationX: offset, y: 0)
+            ])
+            .applyingFilter("CIAffineTransform", parameters: [
+                kCIInputTransformKey: CGAffineTransform(scaleX: 2, y: 2)
+            ])
+        return image.applyingFilter("CIDisplacementDistortion", parameters: [
+            "inputDisplacementImage": displacedNoise,
+            kCIInputScaleKey: 25
+        ])
     }
 }

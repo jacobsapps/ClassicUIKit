@@ -24,6 +24,11 @@ final class GalleryViewController: UIViewController {
     lazy var dataSource = makeDataSource()
     private let loadingView = UIActivityIndicatorView(style: .large)
     private let emptyView = EmptyStateView(message: "Create your first collage by tapping ➕")
+    private lazy var deleteGesture: UILongPressGestureRecognizer = {
+        let gesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+        gesture.minimumPressDuration = 0.5
+        return gesture
+    }()
 
     init(viewModel: GalleryViewModel) {
         self.viewModel = viewModel
@@ -40,6 +45,7 @@ final class GalleryViewController: UIViewController {
         view.backgroundColor = .systemBackground
         configureNavbar()
         layoutViews()
+        collectionView.addGestureRecognizer(deleteGesture)
         applySnapshot()
         updateLoadingState()
         viewModel.load()
@@ -52,6 +58,12 @@ final class GalleryViewController: UIViewController {
     private func configureNavbar() {
         let addImage = UIImage(systemName: "plus")
         navigationItem.rightBarButtonItem = UIBarButtonItem(image: addImage, style: .plain, target: self, action: #selector(handleAddTapped))
+    }
+    
+    private func canvasAspectRatio() -> CGFloat {
+        let bounds = view.window?.bounds ?? UIScreen.main.bounds
+        guard bounds.width > 0 else { return 1 }
+        return bounds.height / bounds.width
     }
 
     private func layoutViews() {
@@ -123,5 +135,26 @@ final class GalleryViewController: UIViewController {
     @objc private func handleAddTapped() {
         let anchor = navigationController?.navigationBar ?? view
         viewModel.createNewCollage(from: anchor)
+    }
+
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        let location = gesture.location(in: collectionView)
+        guard
+            let indexPath = collectionView.indexPathForItem(at: location),
+            let collageID = dataSource.itemIdentifier(for: indexPath)
+        else { return }
+
+        let alert = UIAlertController(title: "Delete collage?", message: "This action can't be undone.", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.viewModel.deleteCollage(id: collageID)
+        })
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        if let popover = alert.popoverPresentationController,
+           let cell = collectionView.cellForItem(at: indexPath) {
+            popover.sourceView = cell
+            popover.sourceRect = cell.bounds
+        }
+        present(alert, animated: true)
     }
 }

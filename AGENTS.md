@@ -13,6 +13,7 @@
 - Hero transitions should animate snapshots into the canvas frame instead of stretching to full screen—use `CollageViewController.canvasFrame(in:)` from custom animators.
 - Shader buttons depend on the Metal kernels in `Shaders/ImageShaders.metal`; keep the compiled `.metallib` in the bundle (falls back to `default.metallib`) and pass Float arguments when invoking kernels so pixellate/glitch/3D effects render correctly.
 - Target is landscape-only; size canvases, hero transitions, and toolbars expecting a wide layout (safe areas handled via Auto Layout).
+- When you need work to hop off the main actor, annotate the method with Swift’s built-in `@concurrent` attribute and, inside, launch `Task.detached` or background work—without it, Swift 6.2 keeps everything on the originating actor and you’ll hit sendability errors.
 - For collection views bound to Observable models, rely on `configurationUpdateHandler` so UIKit re-runs it automatically when the model mutates; don’t wrap it in extra observation helpers.
 - Tests should register mock implementations through the Factory container so view models resolve the correct services, mirroring production DI plumbing; keep hero modal coordinator navigation intact.
 - Favor programmatic UI, isolate async work via `Task` or services, and keep view models simple data/state sources; avoid unnecessary `NSObject` chicanery unless required by UIKit delegates handled by the controller.

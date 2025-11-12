@@ -61,7 +61,7 @@ private final class HeroAnimator: NSObject, UIViewControllerAnimatedTransitionin
         }
 
         UIView.animate(withDuration: duration, delay: 0, usingSpringWithDamping: 0.88, initialSpringVelocity: 0.6, options: [.curveEaseInOut]) {
-            snapshot.frame = targetFrame
+            snapshot.frame = self.aspectFitFrame(for: snapshot, in: targetFrame)
             toView.alpha = 1
         } completion: { finished in
             self.originView?.isHidden = false
@@ -108,5 +108,19 @@ private final class HeroAnimator: NSObject, UIViewControllerAnimatedTransitionin
         let fallbackSnapshot = view.snapshotView(afterScreenUpdates: true) ?? view
         fallbackSnapshot.frame = view.frame
         return fallbackSnapshot
+    }
+
+    private func aspectFitFrame(for snapshot: UIView, in targetFrame: CGRect) -> CGRect {
+        let snapshotSize = snapshot.bounds.size
+        guard snapshotSize.width > 0, snapshotSize.height > 0 else { return targetFrame }
+        let widthScale = targetFrame.width / snapshotSize.width
+        let heightScale = targetFrame.height / snapshotSize.height
+        let scale = min(widthScale, heightScale)
+        let finalSize = CGSize(width: snapshotSize.width * scale, height: snapshotSize.height * scale)
+        let origin = CGPoint(
+            x: targetFrame.midX - finalSize.width / 2,
+            y: targetFrame.midY - finalSize.height / 2
+        )
+        return CGRect(origin: origin, size: finalSize)
     }
 }

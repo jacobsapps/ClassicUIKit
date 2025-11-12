@@ -25,21 +25,8 @@ final class GalleryViewModel {
     func load() {
         loadTask?.cancel()
         isLoading = true
-        let repository = collageRepository
-        let loader = imageLoader
-        loadTask = Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
-            let collages = await MainActor.run { (try? repository.loadCollages()) ?? [] }
-            var models: [GalleryDisplayModel] = []
-            for collage in collages {
-                let image = await MainActor.run { loader.image(for: collage.snapshotPath) }
-                models.append(GalleryDisplayModel(collage: collage, image: image))
-            }
-            await MainActor.run {
-                guard !Task.isCancelled else { return }
-                self.items = models
-                self.isLoading = false
-            }
+        loadTask = Task { [weak self] in
+            await self?.performLoad()
         }
     }
 
@@ -49,5 +36,35 @@ final class GalleryViewModel {
 
     func createNewCollage(from view: UIView?) {
         coordinator?.showCollage(for: nil, from: view)
+    }
+    
+    func deleteCollage(id: UUID) {
+        Task { [weak self] in
+            await self?.performDelete(id: id)
+        }
+    }
+
+    @concurrent
+    private func performLoad() async {
+        let repository = collageRepository
+        let loader = imageLoader
+        let collages = (try? repository.loadCollages()) ?? []
+        let models = collages.map { collage -> GalleryDisplayModel in
+            let image = loader.image(for: collage.snapshotPath)
+            return GalleryDisplayModel(collage: collage, image: image)
+        }
+        await MainActor.run {
+            self.items = models
+            self.isLoading = false
+        }
+    }
+
+    @concurrent
+    private func performDelete(id: UUID) async {
+        let repository = collageRepository
+        try? repository.deleteCollage(id: id)
+        await MainActor.run {
+            self.items.removeAll { $0.collage.id == id }
+        }
     }
 }

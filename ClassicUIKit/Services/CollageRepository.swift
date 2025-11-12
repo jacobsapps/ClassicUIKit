@@ -4,6 +4,7 @@ protocol CollageRepository {
     func loadCollages() throws -> [Collage]
     func loadCollage(id: UUID) throws -> Collage?
     func saveCollage(_ collage: Collage, snapshot: UIImage?) throws -> Collage
+    func deleteCollage(id: UUID) throws
     func persistItemAssets(collageID: UUID, itemID: UUID, baseImage: UIImage, cutout: UIImage?) -> (basePath: String, cutoutPath: String?)
 }
 
@@ -45,6 +46,21 @@ final class CollageRepositoryImpl: CollageRepository {
             cutoutPath = file
         }
         return (basePath, cutoutPath)
+    }
+
+    func deleteCollage(id: UUID) throws {
+        if let collage = try loadCollage(id: id) {
+            if let snapshotPath = collage.snapshotPath {
+                ImageFileManager.delete(snapshotPath)
+            }
+            collage.items.forEach {
+                ImageFileManager.delete($0.baseImagePath)
+                if let cutoutPath = $0.cutoutImagePath {
+                    ImageFileManager.delete(cutoutPath)
+                }
+            }
+        }
+        try database.deleteCollage(id: id)
     }
 
     private func fileName(for collageID: UUID, suffix: String) -> String {

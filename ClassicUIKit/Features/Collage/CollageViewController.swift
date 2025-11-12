@@ -5,6 +5,7 @@ final class CollageViewController: UIViewController {
 
     private let viewModel: CollageViewModel
     private(set) var canvasImageViews: [UUID: CollageCanvasImageView] = [:]
+    private var needsDeferredCanvasSync = false
 
     private let canvasView: UIView = {
         let view = UIView()
@@ -15,7 +16,13 @@ final class CollageViewController: UIViewController {
     }()
 
     private let floatingToolbar = FloatingToolbarView()
-    private let actionToolbar = UIToolbar()
+    private let navigationBar: UINavigationBar = {
+        let bar = UINavigationBar()
+        bar.isTranslucent = true
+        bar.prefersLargeTitles = false
+        return bar
+    }()
+    private let navItem = UINavigationItem(title: "")
     private let savingOverlay = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterial))
     private let savingIndicator = UIActivityIndicatorView(style: .large)
 
@@ -32,7 +39,7 @@ final class CollageViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
-        configureToolbar()
+        configureNavigationBar()
         layoutViews()
         setupCanvasTap()
         viewModel.loadIfNeeded()
@@ -46,6 +53,14 @@ final class CollageViewController: UIViewController {
         }
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if needsDeferredCanvasSync && canvasView.bounds != .zero {
+            needsDeferredCanvasSync = false
+            syncCanvas()
+        }
+    }
+
     override func updateProperties() {
         super.updateProperties()
         syncCanvas()
@@ -53,27 +68,49 @@ final class CollageViewController: UIViewController {
         updateSavingState()
     }
 
-    private func configureToolbar() {
-        let add = UIBarButtonItem(image: UIImage(systemName: "photo.badge.plus.fill"), style: .plain, target: self, action: #selector(handleAddTapped))
-        let save = UIBarButtonItem(image: UIImage(systemName: "square.and.arrow.down.fill"), style: .plain, target: self, action: #selector(handleSaveTapped))
-        let back = UIBarButtonItem(image: UIImage(systemName: "arrow.backward"), style: .plain, target: self, action: #selector(handleBackTapped))
-        let flex = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
-        actionToolbar.items = [back, flex, add, flex, save]
+    private func configureNavigationBar() {
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.clear]
+        navigationBar.standardAppearance = appearance
+        navigationBar.compactAppearance = appearance
+        navigationBar.scrollEdgeAppearance = appearance
+        navigationBar.tintColor = .white
+        navigationBar.setItems([navItem], animated: false)
+
+        let backItem = UIBarButtonItem(image: UIImage(systemName: "arrow.backward"),
+                                       style: .plain,
+                                       target: self,
+                                       action: #selector(handleBackButtonTapped))
+        backItem.accessibilityLabel = "Back"
+
+        let saveItem = UIBarButtonItem(image: UIImage(systemName: "square.and.arrow.down.fill"),
+                                       style: .plain,
+                                       target: self,
+                                       action: #selector(handleSaveButtonTapped))
+        saveItem.accessibilityLabel = "Save Collage"
+
+        let addItem = UIBarButtonItem(image: UIImage(systemName: "photo.badge.plus.fill"),
+                                      style: .plain,
+                                      target: self,
+                                      action: #selector(handleAddButtonTapped))
+        addItem.accessibilityLabel = "Add Photo"
+
+        navItem.leftBarButtonItem = backItem
+        navItem.rightBarButtonItems = [addItem, saveItem]
     }
 
     private func layoutViews() {
         view.insertSubview(canvasView, at: 0)
-        view.addSubview(actionToolbar)
+        view.addSubview(navigationBar)
         view.addSubview(floatingToolbar)
         view.addSubview(savingOverlay)
         savingOverlay.contentView.addSubview(savingIndicator)
 
-        actionToolbar.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide).offset(8)
+        navigationBar.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide)
             make.leading.trailing.equalToSuperview()
         }
-        actionToolbar.setBackgroundImage(UIImage(), forToolbarPosition: .any, barMetrics: .default)
-        actionToolbar.isTranslucent = true
 
         canvasView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -131,6 +168,11 @@ final class CollageViewController: UIViewController {
     }
 
     private func syncCanvas() {
+        guard canvasView.bounds != .zero else {
+            needsDeferredCanvasSync = true
+            return
+        }
+        needsDeferredCanvasSync = false
         let items = viewModel.canvasItems
         let ids = Set(items.map { $0.id })
         for (id, view) in canvasImageViews where !ids.contains(id) {
@@ -194,8 +236,16 @@ final class CollageViewController: UIViewController {
     }
 
     @objc func handleSaveTapped() {
+        let previouslySelectedID = viewModel.selectedItemID
+        if previouslySelectedID != nil {
+            viewModel.selectItem(nil)
+            view.layoutIfNeeded()
+        }
         let snapshot = canvasView.snapshotImage()
         viewModel.saveCollage(snapshot: snapshot)
+        if let previouslySelectedID {
+            viewModel.selectItem(previouslySelectedID)
+        }
     }
 
     func canvasFrame(in targetView: UIView) -> CGRect {
@@ -261,6 +311,18 @@ final class CollageViewController: UIViewController {
         if gesture.state == .ended {
             updateTransform(for: imageView)
         }
+    }
+
+    @objc private func handleBackButtonTapped() {
+        handleBackTapped()
+    }
+
+    @objc private func handleAddButtonTapped() {
+        handleAddTapped()
+    }
+
+    @objc private func handleSaveButtonTapped() {
+        handleSaveTapped()
     }
 }
 

@@ -38,7 +38,7 @@ final class CollageCanvasImageView: UIView {
 
         imageView.clipsToBounds = true
         imageView.layer.cornerRadius = 16
-        imageView.contentMode = .scaleAspectFill
+        imageView.contentMode = .scaleAspectFit
         addSubview(imageView)
         imageView.snp.makeConstraints { make in
             make.edges.equalToSuperview()

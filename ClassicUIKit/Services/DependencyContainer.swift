@@ -2,14 +2,16 @@ import FactoryKit
 import UIKit
 
 extension Container {
+    private func makeCollageDatabase() -> CollageDatabase {
+        do {
+            return try CollageDatabaseImpl()
+        } catch {
+            preconditionFailure("Failed to create CollageDatabaseImpl: \(error)")
+        }
+    }
+
     var collageDatabase: Factory<CollageDatabase> {
-        self {
-            do {
-                return try CollageDatabaseImpl()
-            } catch {
-                fatalError("Failed to create CollageDatabaseImpl: \(error)")
-            }
-        }.singleton
+        self { self.makeCollageDatabase() }.singleton
     }
 
     var collageRepository: Factory<CollageRepository> {
