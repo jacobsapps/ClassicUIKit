@@ -14,6 +14,20 @@ final class CollageViewController: UIViewController {
         view.clipsToBounds = true
         return view
     }()
+    private lazy var emptyView: UIView = {
+        let container = UIView()
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.alignment = .leading
+        stack.spacing = 16
+        stack.addArrangedSubview(makeHelperRow(systemName: "plus", message: "Press + to add your first image"))
+        stack.addArrangedSubview(makeHelperRow(systemName: "photo.badge.checkmark", message: "Press the photo icon to save your collage"))
+        container.addSubview(stack)
+        stack.snp.makeConstraints { make in
+            make.edges.equalToSuperview().inset(24)
+        }
+        return container
+    }()
 
     private let floatingToolbar = FloatingToolbarView()
     private let navigationBar: UINavigationBar = {
@@ -64,6 +78,7 @@ final class CollageViewController: UIViewController {
     override func updateProperties() {
         super.updateProperties()
         syncCanvas()
+        updateEmptyState()
         updateToolbar()
         updateSavingState()
     }
@@ -104,6 +119,7 @@ final class CollageViewController: UIViewController {
         view.insertSubview(canvasView, at: 0)
         view.addSubview(navigationBar)
         view.addSubview(floatingToolbar)
+        view.addSubview(emptyView)
         view.addSubview(savingOverlay)
         savingOverlay.contentView.addSubview(savingIndicator)
         floatingToolbar.setContentHuggingPriority(.required, for: .horizontal)
@@ -126,6 +142,12 @@ final class CollageViewController: UIViewController {
         }
         floatingToolbar.alpha = 0
         floatingToolbar.isHidden = true
+
+        emptyView.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.lessThanOrEqualToSuperview().multipliedBy(0.7)
+        }
+        emptyView.isHidden = !viewModel.canvasItems.isEmpty
 
         savingOverlay.snp.makeConstraints { make in
             make.edges.equalToSuperview()
@@ -170,6 +192,40 @@ final class CollageViewController: UIViewController {
             savingOverlay.isHidden = true
             savingIndicator.stopAnimating()
         }
+    }
+
+    private func updateEmptyState() {
+        emptyView.isHidden = !viewModel.canvasItems.isEmpty
+    }
+
+    private func makeHelperRow(systemName: String, message: String) -> UIStackView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.alignment = .top
+        row.spacing = 12
+
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium, scale: .medium)
+        let imageView = UIImageView(image: UIImage(systemName: systemName, withConfiguration: symbolConfig))
+        imageView.tintColor = .secondaryLabel
+        imageView.setContentHuggingPriority(.required, for: .horizontal)
+        imageView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        imageView.contentMode = .center
+        imageView.snp.makeConstraints { make in
+            make.width.height.equalTo(28)
+        }
+
+        let label = UILabel()
+        label.font = .preferredFont(forTextStyle: .body)
+        label.textColor = .secondaryLabel
+        label.numberOfLines = 0
+        label.textAlignment = .left
+        label.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.text = message
+
+        row.addArrangedSubview(imageView)
+        row.addArrangedSubview(label)
+        return row
     }
 
     private func setupCanvasTap() {
