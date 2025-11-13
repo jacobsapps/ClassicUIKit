@@ -193,8 +193,8 @@ final class FloatingToolbarView: UIView {
     }
 
     private func makeBaseIcon(for shader: ShaderType) -> UIImage? {
-        let size = CGSize(width: 24, height: 24)
-        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        let size = CGSize(width: 44, height: 44)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
         guard let symbol = UIImage(systemName: shader.symbolName, withConfiguration: symbolConfig)?
             .withRenderingMode(.alwaysTemplate) else { return nil }
 
@@ -224,7 +224,7 @@ final class FloatingToolbarView: UIView {
             context.cgContext.restoreGState()
 
             UIColor.white.set()
-            let inset: CGFloat = 4
+            let inset: CGFloat = 10
             symbol.draw(in: rect.insetBy(dx: inset, dy: inset))
         }.withRenderingMode(.alwaysOriginal)
     }
@@ -284,14 +284,13 @@ final class FloatingToggleButton: UIButton {
         didSet { updateAppearance() }
     }
 
-    init(symbolName: String, size: CGFloat = 24) {
+    init(symbolName: String, size: CGFloat = 44) {
         super.init(frame: .zero)
-        var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: symbolName)?.withRenderingMode(.alwaysOriginal)
-        configuration.baseForegroundColor = nil
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
-        configuration.contentInsets = .zero
-        self.configuration = configuration
+        var config = UIButton.Configuration.plain()
+        config.contentInsets = .zero
+        config.imagePadding = 0
+        config.image = makeSymbolImage(named: symbolName, tint: .label)
+        self.configuration = config
         layer.cornerRadius = size / 2
         layer.cornerCurve = .continuous
         layer.borderWidth = 1
@@ -300,6 +299,7 @@ final class FloatingToggleButton: UIButton {
         translatesAutoresizingMaskIntoConstraints = false
         heightAnchor.constraint(equalToConstant: size).isActive = true
         widthAnchor.constraint(equalToConstant: size).isActive = true
+        imageView?.contentMode = .scaleAspectFit
         updateAppearance()
     }
 
@@ -309,16 +309,17 @@ final class FloatingToggleButton: UIButton {
 
     func setIconImage(_ image: UIImage?) {
         configuration?.image = image?.withRenderingMode(.alwaysOriginal)
-        configuration?.preferredSymbolConfigurationForImage = nil
     }
 
     private func updateAppearance() {
         if isToggled {
-            backgroundColor = UIColor.systemBlue.withAlphaComponent(0.9)
+            layer.borderWidth = 2
             layer.borderColor = UIColor.systemBlue.cgColor
+            backgroundColor = UIColor.systemBlue.withAlphaComponent(0.15)
         } else {
-            backgroundColor = UIColor.white.withAlphaComponent(0.18)
+            layer.borderWidth = 1
             layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
+            backgroundColor = UIColor.white.withAlphaComponent(0.18)
         }
     }
 }
@@ -327,21 +328,37 @@ final class FloatingToolbarActionButton: UIButton {
 
     init(symbolName: String, tintColor: UIColor) {
         super.init(frame: .zero)
-        var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: symbolName)
-        configuration.baseForegroundColor = tintColor
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
-        configuration.contentInsets = .zero
-        self.configuration = configuration
-        layer.cornerRadius = 12
+        var config = UIButton.Configuration.plain()
+        config.contentInsets = .zero
+        config.imagePadding = 0
+        config.image = makeSymbolImage(named: symbolName, tint: tintColor)
+        self.configuration = config
+        layer.cornerRadius = 22
         layer.cornerCurve = .continuous
         backgroundColor = UIColor.white.withAlphaComponent(0.18)
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
         translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: 24).isActive = true
-        widthAnchor.constraint(equalToConstant: 24).isActive = true
+        heightAnchor.constraint(equalToConstant: 44).isActive = true
+        widthAnchor.constraint(equalToConstant: 44).isActive = true
+        imageView?.contentMode = .scaleAspectFit
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+}
+
+@inline(__always)
+private func makeSymbolImage(named symbolName: String, tint: UIColor) -> UIImage? {
+    let pointSize: CGFloat = 24
+    let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
+    guard let symbol = UIImage(systemName: symbolName, withConfiguration: config)?
+        .withRenderingMode(.alwaysTemplate) else { return nil }
+    let size = CGSize(width: pointSize, height: pointSize)
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { _ in
+        tint.set()
+        symbol.draw(in: CGRect(origin: .zero, size: size))
+    }.withRenderingMode(.alwaysOriginal)
 }
