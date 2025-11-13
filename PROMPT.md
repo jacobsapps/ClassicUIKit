@@ -55,7 +55,7 @@ You can single-tap on an image to select it, and a small toolbar (container view
 
 First, a scissors icon. This is going to perform vision processing that allows “cutouts” to be created from the image via a VNGenerateForegroundInstanceMaskRequest rendering only the top foreground item. Use this as a reference to see how this is done: /Users/jacob/Writing/Published/SummonSelf/SummonSelf/UI/Generation/GenerationViewModel.swift
 
-Also include 3 buttons that apply metal shaders: Pixellate, threeDGlasses, and glitch. We can copy the code in these files:
+Also include 3 buttons that apply metal shaders: Pixellate, threeDGlasses, and Alien. We can copy the code in these files:
 /Users/jacob/Writing/Published/Camera/RetroCam/RetroCam/Shaders.metal
 /Users/jacob/Writing/Published/Camera/RetroCam/RetroCam/Services/MetalShaderRenderer.swift
 Shaders can be applied to the image in sequence, stacking their transformations in the order that they are toggled. The UIView for images needs to be set up such that the metal shaders can be applied to them when they render. Dependency-inject our metal services into relevant views.
@@ -63,6 +63,8 @@ Shaders can be applied to the image in sequence, stacking their transformations 
 For cutouts, we should ensure they are toggle-able: the original image data should be kept, and the cutout result should also be stored so users can rapidly toggle between the cutout or non-cutout image. Each of the items on the toolbar can be toggled on and off. The shaders will simply activate or not. The buttons should be a toolbar with the Liquid Glass effect https://developer.apple.com/documentation/UIKit/UIGlassEffect
 
 The UI for the buttons should have a clear differentiation between toggled on and toggled off, such as a 3D circle or indent when they are active. 
+
+For Core Image work, reference the CoreImageToy sample at /Users/jacob/Writing/Published/CoreImageToy (both the project file and its shader examples) as well as the CoreImageUtils library in the same location. These should guide how we structure and invoke our CoreImageShaders—mirror their pipeline setup and shader parameter handling when building our own utilities.
 
 ## Image Interactions 
 

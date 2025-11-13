@@ -14,49 +14,23 @@ final class SpectralFilter: CIFilter { }
 @SamplerKernel
 final class ThreeDGlassesShader: CIFilter { }
 
+@ColorKernel
+final class AlienFilter: CIFilter { }
+
 final class PixellateFilter: CIFilter {
 
     @objc dynamic var inputImage: CIImage?
     @objc dynamic var blockSize: Float = 8
 
     override var outputImage: CIImage? {
-        guard let inputImage else { return nil }
-        let sampler = CISampler(image: inputImage)
-        return Self.kernel.apply(
-            extent: inputImage.extent,
-            roiCallback: { _, rect in rect },
-            arguments: [sampler, blockSize]
-        )
+        guard let inputImage,
+              let filter = CIFilter(name: "CIPixellate") else { return nil }
+        filter.setValue(inputImage, forKey: kCIInputImageKey)
+        filter.setValue(blockSize, forKey: kCIInputScaleKey)
+        let center = CIVector(x: inputImage.extent.midX, y: inputImage.extent.midY)
+        filter.setValue(center, forKey: kCIInputCenterKey)
+        return filter.outputImage
     }
-
-    private static let kernel: CIKernel = {
-        ShaderKernelLoader.kernel(named: "pixellateShader")
-    }()
-}
-
-final class GlitchShaderFilter: CIFilter {
-
-    @objc dynamic var inputImage: CIImage?
-    @objc dynamic var time: Float = 0
-
-    override var outputImage: CIImage? {
-        guard let inputImage else { return nil }
-        let sampler = CISampler(image: inputImage)
-        return Self.kernel.apply(
-            extent: inputImage.extent,
-            roiCallback: { _, rect in rect },
-            arguments: [
-                sampler,
-                Float(inputImage.extent.width),
-                Float(inputImage.extent.height),
-                time
-            ]
-        )
-    }
-
-    private static let kernel: CIKernel = {
-        ShaderKernelLoader.kernel(named: "glitchShader")
-    }()
 }
 
 final class ThickGlassSquaresFilter: CIFilter {
@@ -82,8 +56,6 @@ final class ThickGlassSquaresFilter: CIFilter {
 final class LensFilter: CIFilter {
 
     @objc dynamic var inputImage: CIImage?
-    @objc dynamic var width: Float = 0
-    @objc dynamic var height: Float = 0
     @objc dynamic var centerX: Float = 0.5
     @objc dynamic var centerY: Float = 0.5
     @objc dynamic var radius: Float = 0.35
@@ -91,6 +63,8 @@ final class LensFilter: CIFilter {
 
     override var outputImage: CIImage? {
         guard let inputImage else { return nil }
+        let width = self.width > 0 ? self.width : Float(inputImage.extent.width)
+        let height = self.height > 0 ? self.height : Float(inputImage.extent.height)
         return Self.kernel.apply(
             extent: inputImage.extent,
             roiCallback: { _, rect in rect },
@@ -105,6 +79,9 @@ final class LensFilter: CIFilter {
             ]
         )
     }
+
+    @objc dynamic var width: Float = 0
+    @objc dynamic var height: Float = 0
 
     private static let kernel: CIWarpKernel = {
         ShaderKernelLoader.warpKernel(named: "lensFilter")

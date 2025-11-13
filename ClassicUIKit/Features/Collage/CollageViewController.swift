@@ -84,20 +84,20 @@ final class CollageViewController: UIViewController {
                                        action: #selector(handleBackButtonTapped))
         backItem.accessibilityLabel = "Back"
 
-        let saveItem = UIBarButtonItem(image: UIImage(systemName: "square.and.arrow.down.fill"),
+        let saveItem = UIBarButtonItem(image: UIImage(systemName: "photo.badge.checkmark"),
                                        style: .plain,
                                        target: self,
                                        action: #selector(handleSaveButtonTapped))
         saveItem.accessibilityLabel = "Save Collage"
 
-        let addItem = UIBarButtonItem(image: UIImage(systemName: "photo.badge.plus.fill"),
+        let addItem = UIBarButtonItem(image: UIImage(systemName: "plus"),
                                       style: .plain,
                                       target: self,
                                       action: #selector(handleAddButtonTapped))
         addItem.accessibilityLabel = "Add Photo"
 
-        navItem.leftBarButtonItem = backItem
-        navItem.rightBarButtonItems = [addItem, saveItem]
+        navItem.leftBarButtonItems = [backItem, saveItem]
+        navItem.rightBarButtonItem = addItem
     }
 
     private func layoutViews() {
@@ -246,6 +246,10 @@ final class CollageViewController: UIViewController {
     }
 
     @objc func handleSaveTapped() {
+        saveCurrentCollageAndDismiss()
+    }
+
+    private func saveCurrentCollageAndDismiss() {
         let previouslySelectedID = viewModel.selectedItemID
         if previouslySelectedID != nil {
             viewModel.selectItem(nil)
@@ -268,10 +272,15 @@ final class CollageViewController: UIViewController {
             return
         }
         let alert = UIAlertController(title: "Discard changes?", message: "You have unsaved edits.", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Keep Editing", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Discard", style: .destructive) { [weak self] _ in
             self?.viewModel.dismissWithoutSaving()
         })
+        let saveAction = UIAlertAction(title: "Save", style: .default) { [weak self] _ in
+            self?.saveCurrentCollageAndDismiss()
+        }
+        alert.addAction(saveAction)
+        alert.preferredAction = saveAction
         present(alert, animated: true)
     }
 

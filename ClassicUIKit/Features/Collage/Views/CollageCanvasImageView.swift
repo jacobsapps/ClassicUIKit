@@ -8,6 +8,10 @@ final class CollageCanvasImageView: UIView {
     var currentScale: CGFloat
     var currentRotation: CGFloat
 
+    private enum Constants {
+        static let cornerRadius: CGFloat = 16
+    }
+
     private let imageView = UIImageView()
     private let selectionLayer = CAShapeLayer()
     private let loadingView = UIActivityIndicatorView(style: .medium)
@@ -37,7 +41,7 @@ final class CollageCanvasImageView: UIView {
         layer.shadowOffset = CGSize(width: 0, height: 6)
 
         imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 16
+        imageView.layer.cornerRadius = Constants.cornerRadius
         imageView.contentMode = .scaleAspectFit
         addSubview(imageView)
         imageView.snp.makeConstraints { make in
@@ -46,7 +50,7 @@ final class CollageCanvasImageView: UIView {
 
         selectionLayer.fillColor = UIColor.clear.cgColor
         selectionLayer.strokeColor = UIColor.systemBlue.cgColor
-        selectionLayer.lineWidth = 3
+        selectionLayer.lineWidth = 2 / UIScreen.main.scale
         selectionLayer.isHidden = true
         layer.addSublayer(selectionLayer)
 
@@ -59,7 +63,10 @@ final class CollageCanvasImageView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        selectionLayer.path = UIBezierPath(roundedRect: bounds.insetBy(dx: 3, dy: 3), cornerRadius: 18).cgPath
+        let inset = selectionLayer.lineWidth / 2
+        let selectionRect = bounds.insetBy(dx: inset, dy: inset)
+        let selectionCornerRadius = max(Constants.cornerRadius - inset, 0)
+        selectionLayer.path = UIBezierPath(roundedRect: selectionRect, cornerRadius: selectionCornerRadius).cgPath
         selectionLayer.frame = bounds
     }
 

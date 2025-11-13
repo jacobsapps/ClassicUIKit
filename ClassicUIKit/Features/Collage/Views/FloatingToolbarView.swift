@@ -1,5 +1,6 @@
 import UIKit
 import SnapKit
+import FactoryKit
 
 final class FloatingToolbarView: UIView {
 
@@ -7,6 +8,12 @@ final class FloatingToolbarView: UIView {
     var onShaderToggle: ((ShaderType) -> Void)?
     var onDone: (() -> Void)?
     var onDelete: (() -> Void)?
+
+    private enum Constants {
+        static let containerCornerRadius: CGFloat = 26
+        static let blurContentInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
+        static let horizontalContentPadding: CGFloat = 16
+    }
 
     private let blurView: UIVisualEffectView = {
         UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
@@ -39,11 +46,15 @@ final class FloatingToolbarView: UIView {
         return stack
     }()
 
+    @Injected(\.shaderProcessingService) private var shaderService: ShaderProcessingService
+
     private let cutoutButton = FloatingToggleButton(symbolName: "scissors")
     private var shaderButtons: [ShaderType: FloatingToggleButton] = [:]
     private var shaderLookup: [ObjectIdentifier: ShaderType] = [:]
     private let doneButton = FloatingToolbarActionButton(symbolName: "checkmark.circle.fill", tintColor: .systemGreen)
     private let deleteButton = FloatingToolbarActionButton(symbolName: "trash.fill", tintColor: .systemRed)
+    private let leadingSpacer = UIView()
+    private let trailingSpacer = UIView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -55,7 +66,7 @@ final class FloatingToolbarView: UIView {
     }
 
     private func configure() {
-        layer.cornerRadius = 26
+        layer.cornerRadius = Constants.containerCornerRadius
         layer.cornerCurve = .continuous
         layer.masksToBounds = false
         layer.shadowColor = UIColor.black.withAlphaComponent(0.25).cgColor
@@ -64,7 +75,7 @@ final class FloatingToolbarView: UIView {
         layer.shadowOffset = CGSize(width: 0, height: 10)
 
         addSubview(blurView)
-        blurView.layer.cornerRadius = 26
+        blurView.layer.cornerRadius = Constants.containerCornerRadius
         blurView.layer.cornerCurve = .continuous
         blurView.clipsToBounds = true
         blurView.snp.makeConstraints { make in
@@ -74,7 +85,7 @@ final class FloatingToolbarView: UIView {
 
         blurView.contentView.addSubview(scrollView)
         scrollView.snp.makeConstraints { make in
-            make.edges.equalToSuperview().inset(UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16))
+            make.edges.equalToSuperview().inset(Constants.blurContentInset)
         }
 
         scrollView.addSubview(stackView)
@@ -92,16 +103,38 @@ final class FloatingToolbarView: UIView {
         deleteButton.addTarget(self, action: #selector(handleDeleteTap), for: .touchUpInside)
         cutoutButton.addTarget(self, action: #selector(handleCutoutTap), for: .touchUpInside)
 
-        stackView.addArrangedSubview(doneButton)
-        stackView.addArrangedSubview(deleteButton)
-        stackView.addArrangedSubview(cutoutButton)
+        [leadingSpacer, trailingSpacer].forEach { spacer in
+            spacer.translatesAutoresizingMaskIntoConstraints = false
+            spacer.isUserInteractionEnabled = false
+            spacer.backgroundColor = .clear
+            spacer.widthAnchor.constraint(equalToConstant: Constants.horizontalContentPadding).isActive = true
+        }
+
+        stackView.addArrangedSubview(leadingSpacer)
+        stackView.setCustomSpacing(0, after: leadingSpacer)
+
+        var lastInteractiveView: UIView?
+        func appendButton(_ button: UIView) {
+            stackView.addArrangedSubview(button)
+            lastInteractiveView = button
+        }
+
+        appendButton(doneButton)
+        appendButton(deleteButton)
+        appendButton(cutoutButton)
 
         ShaderType.allCases.forEach { shader in
             let button = FloatingToggleButton(symbolName: shader.symbolName)
             button.addTarget(self, action: #selector(handleShaderTap(_:)), for: .touchUpInside)
-            stackView.addArrangedSubview(button)
+            appendButton(button)
             shaderButtons[shader] = button
             shaderLookup[ObjectIdentifier(button)] = shader
+            generatePreview(for: shader, button: button)
+        }
+
+        stackView.addArrangedSubview(trailingSpacer)
+        if let lastInteractiveView {
+            stackView.setCustomSpacing(0, after: lastInteractiveView)
         }
     }
 
@@ -136,6 +169,113 @@ final class FloatingToolbarView: UIView {
     @objc private func handleDeleteTap() {
         onDelete?()
     }
+
+    private func generatePreview(for shader: ShaderType, button: FloatingToggleButton) {
+        guard let baseImage = makeBaseIcon(for: shader) else { return }
+        button.setIconImage(baseImage)
+        Task.detached(priority: .userInitiated) { [weak self, weak button] in
+            guard let self else { return }
+            let filtered = await self.applyPreviewShader(shader, to: baseImage)
+            await MainActor.run {
+                guard
+                    let button,
+                    self.shaderButtons[shader] === button
+                else { return }
+                button.setIconImage(filtered)
+            }
+        }
+    }
+
+    private func applyPreviewShader(_ shader: ShaderType, to image: UIImage) async -> UIImage {
+        await MainActor.run { [weak self] in
+            self?.shaderService.apply(shaders: [shader], to: image) ?? image
+        }
+    }
+
+    private func makeBaseIcon(for shader: ShaderType) -> UIImage? {
+        let size = CGSize(width: 24, height: 24)
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
+        guard let symbol = UIImage(systemName: shader.symbolName, withConfiguration: symbolConfig)?
+            .withRenderingMode(.alwaysTemplate) else { return nil }
+
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let colors = shader.previewGradientColors
+        return renderer.image { context in
+            let rect = CGRect(origin: .zero, size: size)
+            let path = UIBezierPath(roundedRect: rect, cornerRadius: size.width / 2)
+            context.cgContext.saveGState()
+            path.addClip()
+
+            if let gradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: colors.map { $0.cgColor } as CFArray,
+                locations: nil
+            ) {
+                context.cgContext.drawLinearGradient(
+                    gradient,
+                    start: CGPoint(x: 0, y: 0),
+                    end: CGPoint(x: size.width, y: size.height),
+                    options: []
+                )
+            } else {
+                colors.first?.setFill()
+                context.fill(rect)
+            }
+            context.cgContext.restoreGState()
+
+            UIColor.white.set()
+            let inset: CGFloat = 4
+            symbol.draw(in: rect.insetBy(dx: inset, dy: inset))
+        }.withRenderingMode(.alwaysOriginal)
+    }
+
+}
+
+private extension ShaderType {
+    var previewGradientColors: [UIColor] {
+        switch self {
+        case .pixellate:
+            return [
+                UIColor(red: 0.95, green: 0.28, blue: 0.62, alpha: 1.0),
+                UIColor(red: 1.0, green: 0.58, blue: 0.16, alpha: 1.0)
+            ]
+        case .grainy:
+            return [
+                UIColor(red: 0.38, green: 0.32, blue: 0.05, alpha: 1.0),
+                UIColor(red: 0.77, green: 0.65, blue: 0.18, alpha: 1.0)
+            ]
+        case .grayscale:
+            return [
+                UIColor(white: 0.15, alpha: 1.0),
+                UIColor(white: 0.8, alpha: 1.0)
+            ]
+        case .spectral:
+            return [
+                UIColor(red: 0.64, green: 0.14, blue: 0.84, alpha: 1.0),
+                UIColor(red: 1.0, green: 0.33, blue: 0.68, alpha: 1.0)
+            ]
+        case .threeDGlasses:
+            return [
+                UIColor(red: 0.95, green: 0.18, blue: 0.2, alpha: 1.0),
+                UIColor(red: 1.0, green: 0.54, blue: 0.0, alpha: 1.0)
+            ]
+        case .alien:
+            return [
+                UIColor(red: 0.1, green: 0.85, blue: 0.3, alpha: 1.0),
+                UIColor(red: 0.52, green: 1.0, blue: 0.58, alpha: 1.0)
+            ]
+        case .thickGlassSquares:
+            return [
+                UIColor(red: 0.0, green: 0.74, blue: 0.46, alpha: 1.0),
+                UIColor(red: 0.18, green: 0.95, blue: 0.65, alpha: 1.0)
+            ]
+        case .lens:
+            return [
+                UIColor(red: 1.0, green: 0.78, blue: 0.1, alpha: 1.0),
+                UIColor(red: 1.0, green: 0.32, blue: 0.25, alpha: 1.0)
+            ]
+        }
+    }
 }
 
 final class FloatingToggleButton: UIButton {
@@ -144,12 +284,12 @@ final class FloatingToggleButton: UIButton {
         didSet { updateAppearance() }
     }
 
-    init(symbolName: String, size: CGFloat = 44) {
+    init(symbolName: String, size: CGFloat = 24) {
         super.init(frame: .zero)
         var configuration = UIButton.Configuration.plain()
-        configuration.image = UIImage(systemName: symbolName)
-        configuration.baseForegroundColor = .label
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
+        configuration.image = UIImage(systemName: symbolName)?.withRenderingMode(.alwaysOriginal)
+        configuration.baseForegroundColor = nil
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
         configuration.contentInsets = .zero
         self.configuration = configuration
         layer.cornerRadius = size / 2
@@ -167,15 +307,18 @@ final class FloatingToggleButton: UIButton {
         fatalError("init(coder:) has not been implemented")
     }
 
+    func setIconImage(_ image: UIImage?) {
+        configuration?.image = image?.withRenderingMode(.alwaysOriginal)
+        configuration?.preferredSymbolConfigurationForImage = nil
+    }
+
     private func updateAppearance() {
         if isToggled {
             backgroundColor = UIColor.systemBlue.withAlphaComponent(0.9)
             layer.borderColor = UIColor.systemBlue.cgColor
-            configuration?.baseForegroundColor = .white
         } else {
             backgroundColor = UIColor.white.withAlphaComponent(0.18)
             layer.borderColor = UIColor.white.withAlphaComponent(0.35).cgColor
-            configuration?.baseForegroundColor = .label
         }
     }
 }
@@ -187,15 +330,15 @@ final class FloatingToolbarActionButton: UIButton {
         var configuration = UIButton.Configuration.plain()
         configuration.image = UIImage(systemName: symbolName)
         configuration.baseForegroundColor = tintColor
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 20, weight: .semibold)
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 24, weight: .semibold)
         configuration.contentInsets = .zero
         self.configuration = configuration
-        layer.cornerRadius = 22
+        layer.cornerRadius = 12
         layer.cornerCurve = .continuous
         backgroundColor = UIColor.white.withAlphaComponent(0.18)
         translatesAutoresizingMaskIntoConstraints = false
-        heightAnchor.constraint(equalToConstant: 44).isActive = true
-        widthAnchor.constraint(equalToConstant: 44).isActive = true
+        heightAnchor.constraint(equalToConstant: 24).isActive = true
+        widthAnchor.constraint(equalToConstant: 24).isActive = true
     }
 
     required init?(coder: NSCoder) {

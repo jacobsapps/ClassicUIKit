@@ -62,7 +62,7 @@ enum ShaderType: String, Codable, CaseIterable {
     case grayscale
     case spectral
     case threeDGlasses
-    case glitch
+    case alien
     case thickGlassSquares
     case lens
 
@@ -73,7 +73,7 @@ enum ShaderType: String, Codable, CaseIterable {
             .grayscale,
             .spectral,
             .threeDGlasses,
-            .glitch,
+            .alien,
             .thickGlassSquares,
             .lens
         ]
@@ -82,21 +82,22 @@ enum ShaderType: String, Codable, CaseIterable {
     var symbolName: String {
         switch self {
         case .pixellate:
-            return "rectangle.split.2x2"
+            return "squareshape.split.3x3"
         case .grainy:
-            return "circle.grid.2x2"
+            return "water.waves"
         case .grayscale:
             return "circle.lefthalf.filled"
         case .spectral:
-            return "sparkles"
+            return "laser.burst"
         case .threeDGlasses:
             return "eyeglasses"
-        case .glitch:
-            return "waveform"
+        case .alien:
+            return "globe.asia.australia.fill"
         case .thickGlassSquares:
             return "square.grid.2x2.fill"
         case .lens:
-            return "viewfinder"
+            return "globe.fill"
         }
     }
+
 }

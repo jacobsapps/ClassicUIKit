@@ -43,10 +43,8 @@ final class ShaderProcessingServiceImpl: ShaderProcessingService {
             return SpectralFilter()
         case .threeDGlasses:
             return ThreeDGlassesShader()
-        case .glitch:
-            let filter = GlitchShaderFilter()
-            filter.time = Float(CFAbsoluteTimeGetCurrent().truncatingRemainder(dividingBy: 100))
-            return filter
+        case .alien:
+            return AlienFilter()
         case .thickGlassSquares:
             let filter = ThickGlassSquaresFilter()
             filter.intensity = Float(min(extent.width, extent.height) / 32)

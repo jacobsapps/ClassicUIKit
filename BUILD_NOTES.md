@@ -22,7 +22,7 @@
   - Loading/saving collages via `CollageRepository` (SwiftData + filesystem hybrid similar to SummonSelf project).
   - Managing `CanvasItemModel` structs for every image (transform, shaders, z-order, cutouts, asset paths).
   - Cutouts use `VNGenerateForegroundInstanceMaskRequest` (based on SummonSelf's `GenerationViewModel`).
-- Shader stack now processed by `ShaderProcessingServiceImpl` (see below) for pixellate / glitch / 3D effects, keeping images reactive when toggled.
+- Shader stack now processed by `ShaderProcessingServiceImpl` (see below) for pixelate / alien / 3D effects, keeping images reactive when toggled.
   - Tracks `hasUnsavedChanges`, `isSaving`, and selection to drive warnings + toolbar state.
 - `CollageViewController`:
   - Hosts a SnapKit canvas, toolbar, and floating liquid-glass effect control surface.
@@ -43,7 +43,7 @@
 - `ImageLoader` lazily loads cached snapshots and cutouts from disk for the gallery + editing canvas.
 - **Shader pipeline** (`Services/ShaderProcessingService.swift` + `Shaders/ImageShaders.metal`):
   - Inspired by `/Published/CoreImageToy`, replaces the earlier raw Metal compute path with Core Image color kernels (simpler setup, no manual textures).
-  - Pixellate uses `CIPixellate`; glitch & 3D glasses use custom stitchable kernels invoked via `CIKernel(functionName:fromMetalLibraryData:)`.
+  - Pixellate wraps Core Image’s built-in `CIPixellate`, while the alien/3D glasses effects use stitchable kernels loaded via `CIKernel(functionName:fromMetalLibraryData:)`; warp shaders (lens, thick glass) use `CIWarpKernel`.
   - `ShaderProcessingService` keeps the view model decoupled from Core Image; DI exposes `ShaderProcessingServiceImpl`.
 
 ## Tests

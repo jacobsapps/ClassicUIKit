@@ -34,9 +34,15 @@ extension AppCoordinator: GalleryCoordinating {
     func showCollage(for collageID: UUID?, from sourceView: UIView?) {
         let viewModel = CollageViewModel(collageID: collageID, coordinator: self)
         let viewController = CollageViewController(viewModel: viewModel)
-        viewController.modalPresentationStyle = .custom
-        heroTransitionDelegate.originView = sourceView
-        viewController.transitioningDelegate = heroTransitionDelegate
+        if let collageID, let sourceView {
+            viewController.modalPresentationStyle = .custom
+            heroTransitionDelegate.originView = sourceView
+            viewController.transitioningDelegate = heroTransitionDelegate
+        } else {
+            viewController.modalPresentationStyle = .fullScreen
+            viewController.transitioningDelegate = nil
+            heroTransitionDelegate.originView = nil
+        }
         navigationController.present(viewController, animated: true)
     }
 }

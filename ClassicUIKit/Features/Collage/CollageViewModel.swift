@@ -47,9 +47,6 @@ final class CollageViewModel {
         if let loaded {
             collage = loaded
             canvasItems = loaded.items.compactMap(makeCanvasItem)
-            for index in canvasItems.indices where !canvasItems[index].shaderStack.isEmpty {
-                refreshRenderedImage(for: index)
-            }
         }
     }
 
@@ -176,11 +173,18 @@ final class CollageViewModel {
     private func makeCanvasItem(from collageItem: CollageItem) -> CanvasItemModel? {
         guard let baseImage = imageLoader.image(for: collageItem.baseImagePath) else { return nil }
         let cutoutImage = imageLoader.image(for: collageItem.cutoutImagePath)
+        let activeImage = collageItem.usesCutout ? (cutoutImage ?? baseImage) : baseImage
+        let renderedImage: UIImage
+        if collageItem.shaderStack.isEmpty {
+            renderedImage = activeImage
+        } else {
+            renderedImage = shaderService.apply(shaders: collageItem.shaderStack, to: activeImage) ?? activeImage
+        }
         return CanvasItemModel(
             id: collageItem.id,
             baseImage: baseImage,
             cutoutImage: cutoutImage,
-            renderedImage: cutoutImage ?? baseImage,
+            renderedImage: renderedImage,
             basePath: collageItem.baseImagePath,
             cutoutPath: collageItem.cutoutImagePath,
             usesCutout: collageItem.usesCutout,
