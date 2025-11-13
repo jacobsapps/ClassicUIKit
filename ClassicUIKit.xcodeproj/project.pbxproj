@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1692D3A52EC5EB5500A083AF /* CoreImageUtils in Frameworks */ = {isa = PBXBuildFile; productRef = 1692D3A42EC5EB5500A083AF /* CoreImageUtils */; };
 		16D70B5A2EC383E2001D3743 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = 16D70B592EC383E2001D3743 /* SnapKit */; };
 		16D70B5D2EC383EE001D3743 /* FactoryKit in Frameworks */ = {isa = PBXBuildFile; productRef = 16D70B5C2EC383EE001D3743 /* FactoryKit */; };
 /* End PBXBuildFile section */
@@ -51,6 +52,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1692D3A52EC5EB5500A083AF /* CoreImageUtils in Frameworks */,
 				16D70B5D2EC383EE001D3743 /* FactoryKit in Frameworks */,
 				16D70B5A2EC383E2001D3743 /* SnapKit in Frameworks */,
 			);
@@ -119,6 +121,7 @@
 			packageProductDependencies = (
 				16D70B592EC383E2001D3743 /* SnapKit */,
 				16D70B5C2EC383EE001D3743 /* FactoryKit */,
+				1692D3A42EC5EB5500A083AF /* CoreImageUtils */,
 			);
 			productName = ClassicUIKit;
 			productReference = 16D70B272EC3831F001D3743 /* ClassicUIKit.app */;
@@ -155,6 +158,7 @@
 			packageReferences = (
 				16D70B582EC383E2001D3743 /* XCRemoteSwiftPackageReference "SnapKit" */,
 				16D70B5B2EC383EE001D3743 /* XCRemoteSwiftPackageReference "Factory" */,
+				1692D3A32EC5EB5500A083AF /* XCRemoteSwiftPackageReference "CoreImageUtils" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 16D70B282EC3831F001D3743 /* Products */;
@@ -402,7 +406,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				MTLLINKER_FLAGS = "-fcikernel";
+				MTLLINKER_FLAGS = "-framework CoreImage";
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobstechtavern.ClassicUIKit;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -449,7 +453,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				MTLLINKER_FLAGS = "-fcikernel";
+				MTLLINKER_FLAGS = "-framework CoreImage";
 				PRODUCT_BUNDLE_IDENTIFIER = com.jacobstechtavern.ClassicUIKit;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -500,6 +504,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		1692D3A32EC5EB5500A083AF /* XCRemoteSwiftPackageReference "CoreImageUtils" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jacobsapps/CoreImageUtils";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 		16D70B582EC383E2001D3743 /* XCRemoteSwiftPackageReference "SnapKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SnapKit/SnapKit";
@@ -519,6 +531,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1692D3A42EC5EB5500A083AF /* CoreImageUtils */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1692D3A32EC5EB5500A083AF /* XCRemoteSwiftPackageReference "CoreImageUtils" */;
+			productName = CoreImageUtils;
+		};
 		16D70B592EC383E2001D3743 /* SnapKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 16D70B582EC383E2001D3743 /* XCRemoteSwiftPackageReference "SnapKit" */;
