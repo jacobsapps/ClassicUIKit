@@ -1,0 +1,13 @@
+# macOS junk that's already shown up locally
+.DS_Store
+
+# Build products Xcode writes inside the repo
+build/
+DerivedData/
+
+# Per-user Xcode state that keeps getting regenerated
+xcuserdata/
+*.xcuserstate
+
+# SwiftPM metadata created by the Xcode workspace
+ClassicUIKit.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
